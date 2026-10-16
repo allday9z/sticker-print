@@ -1,0 +1,6 @@
+{
+  "name": "sticker-print",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "bun server.ts" }
+}
