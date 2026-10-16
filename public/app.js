@@ -158,7 +158,7 @@
     var all;
     try { all = await api("/api/admin/templates"); } catch (e) { if (e.status === 401) { state.cfg.admin = false; return loginView(viewAdmin); } throw e; }
     setView('<div class="row"><div><h1>จัดการเทมเพลต</h1><p class="sub">สร้างเทมเพลตสติ๊กเกอร์แยกตามหมวด — หน้าสาขาจะเห็นเฉพาะเทมเพลตที่เปิดใช้งาน</p></div><span class="spacer"></span>' +
-      '<button class="btn ghost" id="logout">ออกจากระบบ</button><button class="btn" id="add">+ เพิ่มเทมเพลต</button></div>' +
+      (state.cfg.adminEnabled ? '<button class="btn ghost" id="logout">ออกจากระบบ</button>' : "") + '<button class="btn" id="add">+ เพิ่มเทมเพลต</button></div>' +
       state.cfg.categories.map(function (cat) {
         var ts = all.filter(function (t) { return t.category === cat; });
         return '<div class="card"><h3 style="margin:0 0 6px">' + cat + ' <span class="muted small">(' + ts.length + ')</span> <button class="btn sm ghost" data-addcat="' + cat + '">+ เพิ่มใน ' + cat + '</button></h3><div class="list">' +
@@ -175,7 +175,7 @@
     $$("[data-edit]").forEach(function (b) { b.onclick = function () { editor(byId(b.dataset.edit)); }; });
     $$("[data-dup]").forEach(function (b) { b.onclick = function () { var t = byId(b.dataset.dup); editor({ id: null, category: t.category, name: t.name + " (สำเนา)", data: JSON.parse(JSON.stringify(t.data)), active: true }); }; });
     $$("[data-up],[data-down]").forEach(function (b) { b.onclick = async function () { await api("/api/admin/templates/" + (b.dataset.up || b.dataset.down) + "/move", { method: "POST", body: { dir: b.dataset.up ? "up" : "down" } }); await reloadCfg(); viewAdmin(); }; });
-    $("#logout").onclick = async function () { await api("/api/admin/logout", { method: "POST", body: {} }); state.cfg.admin = false; location.hash = "#/"; };
+    if ($("#logout")) $("#logout").onclick = async function () { await api("/api/admin/logout", { method: "POST", body: {} }); state.cfg.admin = false; location.hash = "#/"; };
   }
   var HINT = { iPhone: { spec: "- 256GB 512GB 1TB 2TB", extra: "" }, iPad: { spec: "Wi-Fi / Cellular · 128GB 256GB", extra: "11\" / 13\"" }, Watch: { spec: "GPS / Cell", extra: "S/M - M/L\n40\" / 44\"" } };
   function editor(t, cat) {

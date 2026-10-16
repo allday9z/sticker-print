@@ -2,7 +2,8 @@
 // laid out on an A4 label sheet (default 5 × 10 = 50 labels, 4.2 × 2.79 cm) and
 // printed by the branches straight from the browser.
 //  - Branches: no login — pick templates + quantities, preview, print.
-//  - Admin (ADMIN_PASSWORD): create / edit templates, sheet calibration.
+//  - Templates / sheet calibration: open to everyone (Smile, 16 Oct 2026: "ไม่จำเป็นต้องมีรหัส").
+//    Setting ADMIN_PASSWORD turns the password back on for those pages.
 // Storage: Postgres (DATABASE_URL), tables prefixed sticker_ (shared instance).
 import { SQL } from "bun"
 import { createHmac, timingSafeEqual } from "node:crypto"
@@ -46,7 +47,7 @@ async function getLayout(): Promise<Layout> {
 const sign = (v: string) => createHmac("sha256", SECRET).update(v).digest("base64url")
 function makeToken(): string { const exp = String(Date.now() + 12 * 3600_000); return exp + "." + sign(exp) }
 function isAdmin(req: Request): boolean {
-  if (!ADMIN_PASSWORD) return false
+  if (!ADMIN_PASSWORD) return true   // no password configured = open access
   const m = (req.headers.get("cookie") ?? "").match(/(?:^|;\s*)sp_admin=([^;]+)/)
   if (!m) return false
   const [exp, sig] = m[1].split(".")
@@ -177,4 +178,4 @@ Bun.serve({
     }
   },
 })
-console.log(`[sticker-print] listening on :${PORT}${ADMIN_PASSWORD ? "" : " (ADMIN_PASSWORD not set — template editing disabled)"}`)
+console.log(`[sticker-print] listening on :${PORT} (template editing: ${ADMIN_PASSWORD ? "password" : "open, no password"})`)
