@@ -1,14 +1,13 @@
-# Sticker Print — สติ๊กเกอร์แปะกล่องสินค้า
+# Sticker Print — สติ๊กเกอร์แปะกล่องสินค้า (v2)
 
-Templates for product-box stickers (iPhone / iPad / Watch) laid out on an A4 label sheet and printed by the branches from the browser.
+Branches pick **model → capacity → colour → supplier** and print stickers from the admin's template on an A4 label sheet.
 
-- **พิมพ์สติ๊กเกอร์** (`#/`, no login): choose templates + quantities, start cell (for part-used sheets), A4 preview, print at real size.
-- **จัดการเทมเพลต** (`#/admin`, open to everyone; set `ADMIN_PASSWORD` to require a password): model, capacity line, colours (each with its own text colour), up to 4 extra lines, SYNNEX logo, font size — live real-size preview; text auto-shrinks to fit the label.
-- **ตั้งค่ากระดาษ** (`#/settings`): default A4 portrait 5 × 10 = 50 labels, 42 × 27.9 mm, top margin 9 mm; offsets / gaps / sizes for calibration + printable test sheet.
-
-Print dialog: A4, scale 100%, no "fit to page", no headers/footers.
+- **Branch page** (`#/`, no login, read-only): categories iPhone / iPad (Watch later), step-by-step choices that only show the capacities / colours configured for the chosen model, real-size preview, queue with quantities, start cell for part-used sheets, A4 preview, print at real size.
+- **Admin** (`#/admin`, Smile only): product data (models, capacities, colours with display colour), suppliers (+ logo upload, PNG/JPG/WEBP checked by magic bytes), sticker template per category (elements: model / capacity / colour / supplier / fixed text — font, size, bold/italic, colour, alignment, spacing, prefix/suffix), paper & label size + calibration test sheet, password change.
+- **Permissions on the server**: every write is under `/api/admin/*` and needs the admin session (HMAC-signed cookie, invalidated on password change); cross-site writes rejected. The admin password is hashed in the DB; the first login with the initial `ADMIN_PASSWORD` must set a new password before anything else works.
+- Seed data = only what was confirmed: iPhone + iPad model lists, suppliers Synnex (logo) / VST / AIS. Capacities and colours are entered by the admin.
 
 ```
-DATABASE_URL=postgres://… PORT=3000 bun server.ts   # optional: ADMIN_PASSWORD=…
+DATABASE_URL=postgres://… ADMIN_PASSWORD=<initial> PORT=3000 bun server.ts
 ```
-Tables `sticker_templates`, `sticker_settings` (shared Postgres), created on start. The logo comes from the sample Pages file.
+Tables: sticker_models / sticker_capacities / sticker_colors / sticker_suppliers / sticker_settings (layout, template:<category>, admin).

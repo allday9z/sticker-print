@@ -1,259 +1,372 @@
-/* Sticker Print — single-page client. Branches print without login; template
-   editing and sheet calibration need the admin password (checked on the server). */
+/* Sticker Print v2 — branches: model → capacity → colour → supplier → print.
+   Admin (Smile): product data, suppliers, template, paper size. Every change is
+   checked on the server (admin session); the branch page only reads. */
 (function () {
   "use strict";
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-  var state = { cfg: null, cat: "all", qty: {}, start: 1 };
-  try { state.qty = JSON.parse(localStorage.getItem("sp_qty") || "{}"); state.start = Number(localStorage.getItem("sp_start") || 1) || 1; } catch (e) {}
-  function saveSel() { try { localStorage.setItem("sp_qty", JSON.stringify(state.qty)); localStorage.setItem("sp_start", String(state.start)); } catch (e) {} }
+  var C = null;   // catalog from the server
+  var ui = { cat: "iPhone", sel: {}, qty: 1, queue: [], start: 1, adminTab: "products", adminCat: "iPhone", tplCat: "iPhone" };
+  try { var saved = JSON.parse(localStorage.getItem("sp2") || "{}"); ui.queue = saved.queue || []; ui.start = saved.start || 1; ui.cat = saved.cat || "iPhone"; } catch (e) {}
+  function persist() { try { localStorage.setItem("sp2", JSON.stringify({ queue: ui.queue, start: ui.start, cat: ui.cat })); } catch (e) {} }
 
   async function api(path, opts) {
     opts = opts || {};
-    var res = await fetch(path, { method: opts.method || "GET", headers: opts.body ? { "Content-Type": "application/json" } : {}, body: opts.body ? JSON.stringify(opts.body) : undefined });
+    var isForm = opts.body instanceof FormData;
+    var res = await fetch(path, { method: opts.method || "GET", headers: opts.body && !isForm ? { "Content-Type": "application/json" } : {}, body: opts.body ? (isForm ? opts.body : JSON.stringify(opts.body)) : undefined });
     var d = await res.json().catch(function () { return {}; });
-    if (!res.ok) { var e = new Error(d.error || "เกิดข้อผิดพลาด"); e.status = res.status; throw e; }
+    if (!res.ok) { var e = new Error(d.error === "auth" ? "กรุณาเข้าสู่ระบบใหม่" : d.error === "mustchange" ? "กรุณาตั้งรหัสผ่านใหม่ก่อน" : d.error || "เกิดข้อผิดพลาด"); e.code = d.error; e.status = res.status; throw e; }
     return d;
   }
   function toast(m) { var t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function () { t.hidden = true; }, 2800); }
-  function modal(html) { $("#modalBox").innerHTML = html; $("#modal").hidden = false; return $("#modalBox"); }
+  function modal(h) { $("#modalBox").innerHTML = h; $("#modal").hidden = false; return $("#modalBox"); }
   function closeModal() { $("#modal").hidden = true; $("#modalBox").innerHTML = ""; }
   $("#modal").addEventListener("click", function (e) { if (e.target.id === "modal") closeModal(); });
-  function field(label, input) { return '<div class="field"><label class="f">' + label + "</label>" + input + "</div>"; }
+  function field(l, i) { return '<div class="field"><label class="f">' + l + "</label>" + i + "</div>"; }
   function setView(h) { $("#app").innerHTML = h; }
 
   /* ---------- sticker rendering (real size: mm / pt) ---------- */
-  var BASE_PT = [7.5, 9, 10.5];   // ขนาดตัวอักษรเริ่มต้น: เล็ก / กลาง / ใหญ่ (ย่อให้พอดีช่องอัตโนมัติ)
-  function L() { return state.cfg.layout; }
-  function stickerHTML(d, extraClass) {
+  var FONT_CSS = { "Helvetica": '"Helvetica Neue", Helvetica, Arial, "Noto Sans Thai", sans-serif', "Noto Sans Thai": '"Noto Sans Thai", sans-serif', "Sarabun": "Sarabun, sans-serif", "Prompt": "Prompt, sans-serif", "Kanit": "Kanit, sans-serif" };
+  function L() { return C.layout; }
+  function applyPageSize() {
+    var s = $("#pagestyle") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "pagestyle" }));
+    s.textContent = "@page { size: " + L().pageW + "mm " + L().pageH + "mm; margin: 0; }";
+  }
+  // vals: { model, capacity, color: {name, hex}, supplier: {name, logo} }
+  function stickerHTML(tpl, v) {
     var lay = L();
-    var colors = (d.colors || []).map(function (c) { return '<span style="color:' + esc(c.hex) + '">' + esc(c.name) + "</span>"; }).join(" / ");
-    return '<div class="stk ' + (extraClass || "") + '" style="width:' + lay.cellW + "mm;height:" + lay.cellH + "mm;padding:" + lay.padding + 'mm"><div class="stk-in" data-base="' + BASE_PT[d.size == null ? 1 : d.size] + '">' +
-      '<div class="m' + (d.bold ? " b" : "") + '">' + esc(d.model) + "</div>" +
-      (d.spec ? '<div class="sp">' + esc(d.spec) + "</div>" : "") +
-      (colors ? '<div class="co">' + colors + "</div>" : "") +
-      (d.extra ? '<div class="ex">' + esc(d.extra) + "</div>" : "") +
-      (d.logo ? '<img class="lg" src="/logo-synnex.png" alt="SYNNEX">' : "") + "</div></div>";
+    var els = tpl.elements.map(function (e) {
+      var color = e.color;
+      var text = "";
+      if (e.type === "model") text = v.model;
+      else if (e.type === "capacity") text = v.capacity;
+      else if (e.type === "color") { text = v.color && v.color.name; if (e.useItemColor && v.color && v.color.hex) color = v.color.hex; }
+      else if (e.type === "text") text = e.text;
+      var style = "font-family:" + (FONT_CSS[e.font] || FONT_CSS.Helvetica) + ";font-size:" + e.size + "pt;font-weight:" + (e.bold ? 700 : 400) + ";font-style:" + (e.italic ? "italic" : "normal") +
+        ";text-align:" + e.align + ";margin-top:" + e.mt + "mm;line-height:" + tpl.lineHeight + ";color:" + color;
+      if (e.type === "supplier") {
+        if (v.supplier && v.supplier.logo) return '<div class="el" style="' + esc(style) + '"><img class="lg" src="' + esc(v.supplier.logo) + '" alt="' + esc(v.supplier.name) + '" style="height:' + e.logoH + 'mm"></div>';
+        text = v.supplier && v.supplier.name;
+      }
+      if (!text) return "";
+      return '<div class="el" style="' + esc(style) + '">' + esc((e.prefix || "") + text + (e.suffix || "")) + "</div>";
+    }).join("");
+    return '<div class="stk" style="width:' + lay.cellW + "mm;height:" + lay.cellH + "mm;padding:" + tpl.padding + "mm;justify-content:" + (tpl.valign === "top" ? "flex-start" : "center") + '">' + els + "</div>";
   }
-  // Shrink the text until it fits the label (never below 5pt).
-  function fit(root) {
-    $$(".stk-in", root || document).forEach(function (el) {
-      var pt = Number(el.dataset.base) || 9;
-      el.style.fontSize = pt + "pt";
-      var guard = 0;
-      while ((el.scrollHeight > el.clientHeight + 0.5 || el.scrollWidth > el.clientWidth + 0.5) && pt > 5 && guard++ < 40) { pt -= 0.25; el.style.fontSize = pt + "pt"; }
-    });
+  // Fixed sizes (as designed) — just flag a label whose content doesn't fit.
+  function markOverflow(root) { var n = 0; $$(".stk", root).forEach(function (s) { var o = s.scrollHeight > s.clientHeight + 1 || s.scrollWidth > s.clientWidth + 1; s.classList.toggle("over", o); if (o) n++; }); return n; }
+  function afterRender(root, cb) {
+    var done = function () { var n = markOverflow(root); if (cb) cb(n); };
+    done();
+    $$("img", root).forEach(function (i) { if (!i.complete) i.addEventListener("load", done, { once: true }); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(done);
   }
-  function fitWhenReady(root) {
-    fit(root);
-    var imgs = $$("img.lg", root).filter(function (i) { return !i.complete; });
-    imgs.forEach(function (i) { i.addEventListener("load", function () { fit(root); }, { once: true }); });
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fit(root); });
+  function valsOf(item) {
+    var sup = C.suppliers.find(function (s) { return s.id === item.supplierId; }) || { name: item.supplierName, logo: null };
+    return { model: item.model, capacity: item.capacity, color: { name: item.color, hex: item.hex }, supplier: { name: sup.name, logo: sup.logo } };
   }
+  function tplFor(cat) { return C.templates[cat]; }
 
   /* ---------- sheets ---------- */
-  function cellPos(i) {
-    var lay = L(), r = Math.floor(i / lay.cols), c = i % lay.cols;
-    return { left: lay.marginLeft + lay.offsetX + c * (lay.cellW + lay.gapX), top: lay.marginTop + lay.offsetY + r * (lay.cellH + lay.gapY) };
-  }
-  // items: array of template data (one per sticker), placed from `start` (1-based) on the first sheet.
-  function buildSheets(items, start, opts) {
-    opts = opts || {};
-    var lay = L(), per = lay.cols * lay.rows, sheets = [], slot = Math.max(0, Math.min(per - 1, start - 1)), cur = null;
-    function newSheet() { cur = new Array(per).fill(null); sheets.push(cur); }
-    newSheet();
+  function cellPos(i) { var l = L(), r = Math.floor(i / l.cols), c = i % l.cols; return { left: l.marginLeft + l.offsetX + c * (l.cellW + l.gapX), top: l.marginTop + l.offsetY + r * (l.cellH + l.gapY) }; }
+  function buildSheets(list, start, o) {   // list: [{tpl, vals}]
+    o = o || {};
+    var l = L(), per = l.cols * l.rows, sheets = [], slot = Math.max(0, Math.min(per - 1, start - 1)), cur;
+    function ns() { cur = new Array(per).fill(null); sheets.push(cur); } ns();
     for (var k = 0; k < slot; k++) cur[k] = "skip";
-    items.forEach(function (d) { if (slot >= per) { newSheet(); slot = 0; } cur[slot++] = d; });
+    list.forEach(function (x) { if (slot >= per) { ns(); slot = 0; } cur[slot++] = x; });
     return sheets.map(function (cells, si) {
-      return '<div class="sheet" data-sheet="' + si + '">' + cells.map(function (d, i) {
-        var p = cellPos(i), cls = "cell" + (lay.showBorders || opts.borders ? " bordered" : "") + (d === "skip" ? " skip" : d ? "" : " empty") + (opts.pick && si === 0 ? " pick" : "");
-        var inner = d && d !== "skip" ? stickerHTML(d) : opts.numbers ? '<div class="stk" style="width:' + lay.cellW + "mm;height:" + lay.cellH + 'mm"><div class="stk-in"><span class="num" style="position:static;font-size:9pt">' + (i + 1) + "</span></div></div>" : "";
-        return '<div class="' + cls + '" data-i="' + i + '" style="left:' + p.left + "mm;top:" + p.top + "mm;width:" + lay.cellW + "mm;height:" + lay.cellH + 'mm">' + inner + "</div>";
+      return '<div class="sheet" data-sheet="' + si + '" style="width:' + l.pageW + "mm;height:" + l.pageH + 'mm">' + cells.map(function (x, i) {
+        var p = cellPos(i), cls = "cell" + (l.showBorders || o.borders ? " bordered" : "") + (x === "skip" ? " skip" : x ? "" : " empty") + (o.pick && si === 0 ? " pick" : "");
+        var inner = x && x !== "skip" ? stickerHTML(x.tpl, x.vals) : o.numbers ? '<div class="numcell">' + (i + 1) + "</div>" : "";
+        return '<div class="' + cls + '" data-i="' + i + '" style="left:' + p.left + "mm;top:" + p.top + "mm;width:" + l.cellW + "mm;height:" + l.cellH + 'mm">' + inner + "</div>";
       }).join("") + "</div>";
     });
   }
-  // Scale real-size sheets to fit their wrapper on screen.
   function scaleSheets(root, width) {
-    $$(".sheetwrap", root).forEach(function (w) {
-      var s = w.querySelector(".sheet"), k = width / s.offsetWidth;
-      s.style.transform = "scale(" + k + ")"; w.style.width = width + "px"; w.style.height = s.offsetHeight * k + "px";
-    });
+    $$(".sheetwrap", root).forEach(function (w) { var s = w.querySelector(".sheet"), k = width / s.offsetWidth; s.style.transform = "scale(" + k + ")"; w.style.width = width + "px"; w.style.height = s.offsetHeight * k + "px"; });
   }
   function printSheets(html) {
+    applyPageSize();
     var pa = $("#printArea"); pa.innerHTML = html.join("");
-    fitWhenReady(pa);
-    var imgs = $$("img", pa).filter(function (i) { return !i.complete; });
-    var go = function () { setTimeout(function () { fit(pa); window.print(); }, 150); };
+    var imgs = $$("img", pa).filter(function (i) { return !i.complete; }), go = function () { (document.fonts ? document.fonts.ready : Promise.resolve()).then(function () { setTimeout(function () { window.print(); }, 120); }); };
     if (!imgs.length) return go();
-    var left = imgs.length; imgs.forEach(function (i) { var done = function () { if (--left === 0) go(); }; i.addEventListener("load", done, { once: true }); i.addEventListener("error", done, { once: true }); });
+    var left = imgs.length; imgs.forEach(function (i) { var d = function () { if (--left === 0) go(); }; i.addEventListener("load", d, { once: true }); i.addEventListener("error", d, { once: true }); });
   }
 
   /* ---------- nav ---------- */
   function renderNav() {
-    var cur = location.hash.split("?")[0] || "#/";
-    var links = [["#/", "พิมพ์สติ๊กเกอร์"], ["#/admin", "จัดการเทมเพลต"], ["#/settings", "ตั้งค่ากระดาษ"]];
-    $("#nav").innerHTML = links.map(function (l) { return '<a href="' + l[0] + '" class="' + (cur === l[0] ? "on" : "") + '">' + l[1] + "</a>"; }).join("");
+    var cur = (location.hash || "#/").split("?")[0];
+    $("#nav").innerHTML = [["#/", "พิมพ์สติ๊กเกอร์"], ["#/admin", "ผู้ดูแลระบบ"]].map(function (l) { return '<a href="' + l[0] + '" class="' + (cur === l[0] ? "on" : "") + '">' + l[1] + "</a>"; }).join("");
   }
 
-  /* ---------- print page (branches) ---------- */
-  function selectedItems() {
-    var items = [];
-    state.cfg.templates.forEach(function (t) { var n = Number(state.qty[t.id]) || 0; for (var i = 0; i < n; i++) items.push(t.data); });
-    return items;
-  }
+  /* ================= branch page ================= */
+  function modelsOf(cat) { return C.models.filter(function (m) { return m.category === cat; }); }
   function viewPrint() {
-    var cfg = state.cfg, lay = L(), per = lay.cols * lay.rows;
-    // forget quantities of templates that no longer exist
-    Object.keys(state.qty).forEach(function (id) { if (!cfg.templates.some(function (t) { return String(t.id) === id; })) delete state.qty[id]; });
-    var cats = ["all"].concat(cfg.categories);
-    var list = cfg.templates.filter(function (t) { return state.cat === "all" || t.category === state.cat; });
-    setView('<h1>พิมพ์สติ๊กเกอร์แปะกล่องสินค้า</h1><p class="sub">เลือกเทมเพลตและจำนวน → ตรวจตัวอย่างหน้ากระดาษ → กดพิมพ์ (กระดาษ A4 · ' + per + " ช่อง/แผ่น)</p>" +
+    var cats = C.categories.filter(function (c) { return modelsOf(c).length; });
+    if (cats.indexOf(ui.cat) === -1) ui.cat = cats[0] || "iPhone";
+    setView('<h1>พิมพ์สติ๊กเกอร์แปะกล่องสินค้า</h1><p class="sub">เลือกข้อมูลสินค้าทีละขั้น → ตรวจตัวอย่าง → เพิ่มลงแผ่น → พิมพ์</p>' +
       '<div class="layout"><div>' +
-      '<div class="tabs">' + cats.map(function (c) { var n = c === "all" ? cfg.templates.length : cfg.templates.filter(function (t) { return t.category === c; }).length; return '<button class="tab' + (state.cat === c ? " on" : "") + '" data-cat="' + c + '">' + (c === "all" ? "ทั้งหมด" : c) + " (" + n + ")</button>"; }).join("") + "</div>" +
-      (list.length ? '<div class="tpls">' + list.map(function (t) {
-        var n = Number(state.qty[t.id]) || 0;
-        return '<div class="tpl' + (n ? " has" : "") + '" data-id="' + t.id + '"><div class="pv">' + stickerHTML(t.data) + '</div><div><div class="name">' + esc(t.name) + '</div><div class="cat">' + esc(t.category) + "</div></div>" +
-          '<div class="row"><div class="qty"><button data-dec="' + t.id + '">−</button><input class="i" type="number" min="0" max="500" value="' + n + '" data-q="' + t.id + '"><button data-inc="' + t.id + '">+</button></div><span class="spacer"></span><button class="btn sm ghost" data-fill="' + t.id + '">เต็มแผ่น</button></div></div>';
-      }).join("") + "</div>" : '<div class="card muted">ยังไม่มีเทมเพลตในหมวดนี้' + (cfg.admin ? ' — <a href="#/admin">เพิ่มเทมเพลต</a>' : " — ติดต่อผู้ดูแลเพื่อเพิ่มเทมเพลต") + "</div>") +
-      '</div><div class="side"><div class="card" id="sideCard"></div></div></div>');
-    $$("[data-cat]").forEach(function (b) { b.onclick = function () { state.cat = b.dataset.cat; viewPrint(); }; });
-    function setQ(id, v) { v = Math.max(0, Math.min(500, Math.round(Number(v) || 0))); if (v) state.qty[id] = v; else delete state.qty[id]; saveSel(); var inp = $('[data-q="' + id + '"]'); if (inp && Number(inp.value) !== v) inp.value = v; var card = $('.tpl[data-id="' + id + '"]'); if (card) card.classList.toggle("has", v > 0); renderSide(); }
-    $$("[data-dec]").forEach(function (b) { b.onclick = function () { setQ(b.dataset.dec, (Number(state.qty[b.dataset.dec]) || 0) - 1); }; });
-    $$("[data-inc]").forEach(function (b) { b.onclick = function () { setQ(b.dataset.inc, (Number(state.qty[b.dataset.inc]) || 0) + 1); }; });
-    $$("[data-q]").forEach(function (i) { i.oninput = function () { setQ(i.dataset.q, i.value); }; });
-    $$("[data-fill]").forEach(function (b) { b.onclick = function () { var others = selectedItems().length - (Number(state.qty[b.dataset.fill]) || 0); var room = per - ((state.start - 1 + others) % per); setQ(b.dataset.fill, (Number(state.qty[b.dataset.fill]) || 0) + (room === per && others ? per : room)); }; });
-    fitWhenReady($("#app"));
-    renderSide();
+      '<div class="tabs">' + C.categories.map(function (c) { var has = modelsOf(c).length; return '<button class="tab' + (ui.cat === c ? " on" : "") + '" data-cat="' + c + '"' + (has ? "" : " disabled") + ">" + c + (has ? "" : " (เร็วๆ นี้)") + "</button>"; }).join("") + "</div>" +
+      '<div class="card" id="steps"></div><div class="card" id="pv"></div></div>' +
+      '<div class="side"><div class="card" id="queue"></div></div></div>');
+    $$("[data-cat]").forEach(function (b) { b.onclick = function () { ui.cat = b.dataset.cat; ui.sel = {}; persist(); viewPrint(); }; });
+    renderSteps(); renderQueue();
   }
-  function renderSide() {
-    var lay = L(), per = lay.cols * lay.rows, items = selectedItems(), side = $("#sideCard"); if (!side) return;
-    if (state.start > per) state.start = 1;
-    var sheets = buildSheets(items, state.start, { pick: true, borders: true });
-    side.innerHTML = '<div class="row"><div class="sum"><b>' + items.length + '</b> ดวง · <b>' + (items.length ? sheets.length : 0) + "</b> แผ่น</div><span class=\"spacer\"></span>" +
-      '<button class="btn ghost sm" id="clear"' + (items.length ? "" : " disabled") + '>ล้าง</button></div>' +
-      '<div class="row" style="margin-top:8px"><label class="small">เริ่มพิมพ์ที่ช่อง</label><input class="i" type="number" min="1" max="' + per + '" id="start" value="' + state.start + '" style="width:80px"><span class="small muted">(กดช่องในตัวอย่างได้ — ใช้กับกระดาษที่ใช้ไปแล้วบางส่วน)</span></div>' +
+  function renderSteps() {
+    var s = ui.sel, models = modelsOf(ui.cat), m = models.find(function (x) { return x.id === s.modelId; });
+    function step(n, title, done, body, value) {
+      return '<div class="step' + (done ? " done" : "") + '"><div class="sh"><span class="sn">' + n + "</span><b>" + title + "</b>" + (value ? '<span class="sv">' + esc(value) + "</span>" : "") + "</div>" + body + "</div>";
+    }
+    var opts = function (items, key, cur, render) { return '<div class="opts">' + items.map(function (it, i) { return '<button class="opt' + (cur === i ? " on" : "") + '" data-' + key + '="' + i + '">' + render(it) + "</button>"; }).join("") + "</div>"; };
+    var h = step(1, "เลือกรุ่น " + ui.cat, !!m, opts(models, "m", m ? models.indexOf(m) : -1, function (x) { return esc(x.name); }), m && m.name);
+    if (m) {
+      var ci = s.capacity != null ? m.capacities.indexOf(s.capacity) : -1;
+      h += step(2, "เลือกความจุ", ci > -1, m.capacities.length ? opts(m.capacities, "c", ci, esc) : '<div class="empty-note">ยังไม่มีข้อมูลความจุของรุ่นนี้ — กรุณาติดต่อผู้ดูแลระบบ</div>', ci > -1 ? s.capacity : "");
+      if (ci > -1) {
+        var ki = s.color != null ? m.colors.findIndex(function (c) { return c.name === s.color; }) : -1;
+        h += step(3, "เลือกสีเครื่อง", ki > -1, m.colors.length ? opts(m.colors, "k", ki, function (c) { return '<span class="sw" style="background:' + esc(c.hex) + '"></span>' + esc(c.name); }) : '<div class="empty-note">ยังไม่มีข้อมูลสีของรุ่นนี้ — กรุณาติดต่อผู้ดูแลระบบ</div>', ki > -1 ? s.color : "");
+        if (ki > -1) {
+          var si = C.suppliers.findIndex(function (x) { return x.id === s.supplierId; });
+          h += step(4, "เลือก Supplier", si > -1, C.suppliers.length ? opts(C.suppliers, "s", si, function (x) { return x.logo ? '<img src="' + esc(x.logo) + '" alt="' + esc(x.name) + '" class="olg"><span class="small">' + esc(x.name) + "</span>" : esc(x.name); }) : '<div class="empty-note">ยังไม่มีซัพพลายเออร์</div>', si > -1 ? C.suppliers[si].name : "");
+        }
+      }
+    }
+    $("#steps").innerHTML = h;
+    $$("[data-m]").forEach(function (b) { b.onclick = function () { var x = models[Number(b.dataset.m)]; ui.sel = { modelId: x.id }; renderSteps(); }; });
+    $$("[data-c]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: m.id, capacity: m.capacities[Number(b.dataset.c)] }; renderSteps(); }; });
+    $$("[data-k]").forEach(function (b) { b.onclick = function () { var c = m.colors[Number(b.dataset.k)]; ui.sel = { modelId: m.id, capacity: s.capacity, color: c.name, hex: c.hex }; renderSteps(); }; });
+    $$("[data-s]").forEach(function (b) { b.onclick = function () { ui.sel.supplierId = C.suppliers[Number(b.dataset.s)].id; renderSteps(); }; });
+    renderPreview();
+  }
+  function currentItem() {
+    var s = ui.sel, m = C.models.find(function (x) { return x.id === s.modelId; }), sup = C.suppliers.find(function (x) { return x.id === s.supplierId; });
+    if (!m || s.capacity == null || s.color == null || !sup) return null;
+    return { cat: ui.cat, model: m.name, capacity: s.capacity, color: s.color, hex: s.hex, supplierId: sup.id, supplierName: sup.name };
+  }
+  function renderPreview() {
+    var it = currentItem(), pv = $("#pv");
+    if (!it) { pv.innerHTML = '<div class="muted">ตัวอย่างสติ๊กเกอร์จะแสดงเมื่อเลือกครบ 4 ขั้นตอน</div>'; return; }
+    pv.innerHTML = '<div class="row"><b>ตัวอย่างสติ๊กเกอร์</b><span class="spacer"></span><span class="small muted">ขนาดจริง ' + L().cellW + " × " + L().cellH + ' มม. (แสดงขยาย 2 เท่า)</span></div>' +
+      '<div class="pvbox"><div class="zoom2">' + stickerHTML(tplFor(it.cat), valsOf(it)) + "</div></div>" +
+      '<div class="row" style="justify-content:center"><label>จำนวน</label><div class="qty"><button id="qm">−</button><input class="i" type="number" min="1" max="500" id="qn" value="' + ui.qty + '"><button id="qp">+</button></div>' +
+      '<button class="btn ghost" id="qfill">เต็มแผ่น</button><button class="btn" id="add">+ เพิ่มลงแผ่น</button></div><div class="err" id="pverr"></div>';
+    afterRender(pv, function (n) { $("#pverr").textContent = n ? "ข้อความยาวเกินช่องสติ๊กเกอร์ — แจ้งผู้ดูแลระบบให้ปรับเทมเพลต" : ""; });
+    var setQ = function (v) { ui.qty = Math.max(1, Math.min(500, Math.round(Number(v) || 1))); $("#qn").value = ui.qty; };
+    $("#qm").onclick = function () { setQ(ui.qty - 1); }; $("#qp").onclick = function () { setQ(ui.qty + 1); }; $("#qn").oninput = function () { setQ(this.value); };
+    $("#qfill").onclick = function () { var per = L().cols * L().rows, used = (ui.start - 1 + totalQty()) % per; setQ(per - used || per); };
+    $("#add").onclick = function () {
+      var key = JSON.stringify([it.cat, it.model, it.capacity, it.color, it.supplierId]), ex = ui.queue.find(function (q) { return q.key === key; });
+      if (ex) ex.qty += ui.qty; else ui.queue.push(Object.assign({ key: key, qty: ui.qty }, it));
+      persist(); toast("เพิ่ม " + ui.qty + " ดวง: " + it.model + " " + it.capacity + " " + it.color); renderQueue();
+    };
+  }
+  function totalQty() { return ui.queue.reduce(function (a, q) { return a + q.qty; }, 0); }
+  function queueList() { var out = []; ui.queue.forEach(function (q) { var t = tplFor(q.cat), v = valsOf(q); for (var i = 0; i < q.qty; i++) out.push({ tpl: t, vals: v }); }); return out; }
+  function renderQueue() {
+    var box = $("#queue"); if (!box) return;
+    var l = L(), per = l.cols * l.rows; if (ui.start > per) ui.start = 1;
+    var list = queueList(), sheets = buildSheets(list, ui.start, { pick: true, borders: true });
+    box.innerHTML = '<div class="row"><b>รายการที่จะพิมพ์</b><span class="spacer"></span><span><b>' + list.length + "</b> ดวง · <b>" + (list.length ? sheets.length : 0) + "</b> แผ่น</span></div>" +
+      (ui.queue.length ? '<div class="ql">' + ui.queue.map(function (q, i) {
+        return '<div class="qi"><div class="qt"><b>' + esc(q.model) + "</b> " + esc(q.capacity) + " · " + esc(q.color) + '<div class="small muted">' + esc(q.supplierName) + '</div></div><input class="i" type="number" min="1" max="500" value="' + q.qty + '" data-qq="' + i + '"><button class="x" data-qx="' + i + '" title="ลบ">×</button></div>';
+      }).join("") + "</div>" : '<p class="muted small">ยังไม่มีรายการ — เลือกสินค้าแล้วกด "เพิ่มลงแผ่น"</p>') +
+      '<div class="row" style="margin-top:8px"><label class="small">เริ่มพิมพ์ที่ช่อง</label><input class="i" type="number" min="1" max="' + per + '" id="start" value="' + ui.start + '" style="width:76px"><span class="small muted">กดช่องในตัวอย่างได้ (กระดาษที่ใช้ไปแล้วบางส่วน)</span></div>' +
       sheets.map(function (h, i) { return '<div class="sheetwrap">' + h + '</div><div class="sheetlabel">แผ่นที่ ' + (i + 1) + " / " + sheets.length + "</div>"; }).join("") +
-      '<button class="btn" id="print" style="width:100%;justify-content:center;margin-top:10px"' + (items.length ? "" : " disabled") + '>พิมพ์ ' + (items.length ? sheets.length + " แผ่น" : "") + "</button>" +
-      '<p class="small muted" style="margin:10px 0 0">ตอนพิมพ์: เลือกกระดาษ A4 · ขนาด/สเกล <b>100% (ขนาดจริง)</b> ไม่ใช้ "พอดีหน้ากระดาษ" · ระยะขอบ <b>ไม่มี/ค่าเริ่มต้น</b> · ปิดหัว-ท้ายกระดาษ</p>';
-    scaleSheets(side, side.clientWidth - 34);
-    fitWhenReady(side);
-    $("#start").oninput = function () { state.start = Math.max(1, Math.min(per, Math.round(Number(this.value) || 1))); saveSel(); renderSide(); };
-    $$('.sheet[data-sheet="0"] .cell.pick', side).forEach(function (c) { c.onclick = function () { state.start = Number(c.dataset.i) + 1; saveSel(); renderSide(); }; });
-    $("#clear").onclick = function () { state.qty = {}; saveSel(); viewPrint(); };
-    $("#print").onclick = function () { printSheets(buildSheets(selectedItems(), state.start)); };
+      '<div class="row"><button class="btn ghost" id="qclear"' + (list.length ? "" : " disabled") + '>ล้างรายการ</button><span class="spacer"></span><button class="btn" id="print"' + (list.length ? "" : " disabled") + ">พิมพ์ " + (list.length ? sheets.length + " แผ่น" : "") + "</button></div>" +
+      '<p class="small muted" style="margin:10px 0 0">ตอนพิมพ์: กระดาษ ' + (l.pageW === 210 && l.pageH === 297 ? "A4" : l.pageW + " × " + l.pageH + " มม.") + " · สเกล <b>100% (ขนาดจริง)</b> ไม่เลือก \"พอดีหน้ากระดาษ\" · ปิดหัว-ท้ายกระดาษ</p>";
+    scaleSheets(box, box.clientWidth - 34);
+    afterRender(box);
+    $$("[data-qq]").forEach(function (inp) { inp.onchange = function () { ui.queue[Number(inp.dataset.qq)].qty = Math.max(1, Math.min(500, Math.round(Number(inp.value) || 1))); persist(); renderQueue(); }; });
+    $$("[data-qx]").forEach(function (x) { x.onclick = function () { ui.queue.splice(Number(x.dataset.qx), 1); persist(); renderQueue(); }; });
+    $("#start").onchange = function () { ui.start = Math.max(1, Math.min(per, Math.round(Number(this.value) || 1))); persist(); renderQueue(); };
+    $$('.sheet[data-sheet="0"] .cell.pick', box).forEach(function (c) { c.onclick = function () { ui.start = Number(c.dataset.i) + 1; persist(); renderQueue(); }; });
+    $("#qclear").onclick = function () { if (confirm("ล้างรายการทั้งหมด?")) { ui.queue = []; persist(); renderQueue(); } };
+    $("#print").onclick = function () { printSheets(buildSheets(queueList(), ui.start)); };
   }
 
-  /* ---------- admin: templates ---------- */
-  function loginView(after) {
-    setView('<div class="card" style="max-width:380px;margin:8vh auto"><h1>เข้าสู่ระบบผู้ดูแล</h1><p class="sub">ใช้สำหรับสร้าง/แก้ไขเทมเพลต และตั้งค่ากระดาษ</p>' +
-      (state.cfg.adminEnabled ? field("รหัสผ่าน", '<input class="i" type="password" id="pw" autocomplete="current-password">') + '<div class="err" id="err"></div><button class="btn" id="go" style="width:100%;justify-content:center">เข้าสู่ระบบ</button>'
-        : '<div class="note">ยังไม่ได้ตั้งรหัสผ่านผู้ดูแลบนเซิร์ฟเวอร์ (ADMIN_PASSWORD)</div>') + "</div>");
-    if (!state.cfg.adminEnabled) return;
-    var go = async function () { try { await api("/api/admin/login", { method: "POST", body: { password: $("#pw").value } }); state.cfg.admin = true; after(); } catch (e) { $("#err").textContent = e.message; } };
+  /* ================= admin ================= */
+  function loginView() {
+    setView('<div class="card" style="max-width:380px;margin:8vh auto"><h1>ผู้ดูแลระบบ</h1><p class="sub">จัดการข้อมูลสินค้า เทมเพลต และขนาดกระดาษ</p>' +
+      field("รหัสผ่าน", '<input class="i" type="password" id="pw" autocomplete="current-password">') + '<div class="err" id="err"></div><button class="btn" id="go" style="width:100%;justify-content:center">เข้าสู่ระบบ</button></div>');
+    var go = async function () { try { var r = await api("/api/admin/login", { method: "POST", body: { password: $("#pw").value } }); C.admin = true; C.mustChange = r.mustChange; viewAdmin(); } catch (e) { $("#err").textContent = e.message; } };
     $("#go").onclick = go; $("#pw").addEventListener("keydown", function (e) { if (e.key === "Enter") go(); }); $("#pw").focus();
   }
-  async function viewAdmin() {
-    if (!state.cfg.admin) return loginView(viewAdmin);
-    var all;
-    try { all = await api("/api/admin/templates"); } catch (e) { if (e.status === 401) { state.cfg.admin = false; return loginView(viewAdmin); } throw e; }
-    setView('<div class="row"><div><h1>จัดการเทมเพลต</h1><p class="sub">สร้างเทมเพลตสติ๊กเกอร์แยกตามหมวด — หน้าสาขาจะเห็นเฉพาะเทมเพลตที่เปิดใช้งาน</p></div><span class="spacer"></span>' +
-      (state.cfg.adminEnabled ? '<button class="btn ghost" id="logout">ออกจากระบบ</button>' : "") + '<button class="btn" id="add">+ เพิ่มเทมเพลต</button></div>' +
-      state.cfg.categories.map(function (cat) {
-        var ts = all.filter(function (t) { return t.category === cat; });
-        return '<div class="card"><h3 style="margin:0 0 6px">' + cat + ' <span class="muted small">(' + ts.length + ')</span> <button class="btn sm ghost" data-addcat="' + cat + '">+ เพิ่มใน ' + cat + '</button></h3><div class="list">' +
-          (ts.length ? ts.map(function (t, i) {
-            return '<div class="it' + (t.active ? "" : " off") + '"><div class="pvs">' + stickerHTML(t.data) + '</div><div class="main"><b>' + esc(t.name) + "</b>" + (t.active ? "" : ' <span class="small muted">(ปิดใช้งาน)</span>') + '<div class="small muted">' + esc([t.data.spec, (t.data.colors || []).map(function (c) { return c.name; }).join(" / ")].filter(Boolean).join(" · ")) + "</div></div>" +
-              '<button class="btn sm ghost" data-up="' + t.id + '"' + (i === 0 ? " disabled" : "") + '>▲</button><button class="btn sm ghost" data-down="' + t.id + '"' + (i === ts.length - 1 ? " disabled" : "") + '>▼</button>' +
-              '<button class="btn sm ghost" data-dup="' + t.id + '">ทำสำเนา</button><button class="btn sm" data-edit="' + t.id + '">แก้ไข</button></div>';
-          }).join("") : '<div class="muted small">ยังไม่มีเทมเพลต</div>') + "</div></div>";
-      }).join(""));
-    fitWhenReady($("#app"));
-    var byId = function (id) { return all.find(function (t) { return String(t.id) === String(id); }); };
-    $("#add").onclick = function () { editor(null, "iPhone"); };
-    $$("[data-addcat]").forEach(function (b) { b.onclick = function () { editor(null, b.dataset.addcat); }; });
-    $$("[data-edit]").forEach(function (b) { b.onclick = function () { editor(byId(b.dataset.edit)); }; });
-    $$("[data-dup]").forEach(function (b) { b.onclick = function () { var t = byId(b.dataset.dup); editor({ id: null, category: t.category, name: t.name + " (สำเนา)", data: JSON.parse(JSON.stringify(t.data)), active: true }); }; });
-    $$("[data-up],[data-down]").forEach(function (b) { b.onclick = async function () { await api("/api/admin/templates/" + (b.dataset.up || b.dataset.down) + "/move", { method: "POST", body: { dir: b.dataset.up ? "up" : "down" } }); await reloadCfg(); viewAdmin(); }; });
-    if ($("#logout")) $("#logout").onclick = async function () { await api("/api/admin/logout", { method: "POST", body: {} }); state.cfg.admin = false; location.hash = "#/"; };
+  function passwordView(forced) {
+    var h = '<div class="card" style="max-width:420px;' + (forced ? "margin:6vh auto" : "") + '"><h2 style="margin-top:0">' + (forced ? "ตั้งรหัสผ่านใหม่ (ครั้งแรก)" : "เปลี่ยนรหัสผ่าน") + "</h2>" +
+      (forced ? '<p class="sub">รหัสผ่านเริ่มต้นใช้ได้ครั้งเดียว — ตั้งรหัสผ่านของคุณเอง (อย่างน้อย 8 ตัวอักษร) แล้วรหัสเริ่มต้นจะใช้ไม่ได้อีก</p>' : '<p class="sub">เมื่อเปลี่ยนแล้ว ทุกเครื่องที่เคยเข้าสู่ระบบจะต้องเข้าใหม่</p>') +
+      field("รหัสผ่านปัจจุบัน", '<input class="i" type="password" id="p0" autocomplete="current-password">') + field("รหัสผ่านใหม่", '<input class="i" type="password" id="p1" autocomplete="new-password">') + field("ยืนยันรหัสผ่านใหม่", '<input class="i" type="password" id="p2" autocomplete="new-password">') +
+      '<div class="err" id="perr"></div><button class="btn" id="psave">บันทึกรหัสผ่าน</button></div>';
+    return { html: h, bind: function () { $("#psave").onclick = async function () {
+      if ($("#p1").value !== $("#p2").value) { $("#perr").textContent = "รหัสผ่านใหม่ไม่ตรงกัน"; return; }
+      try { await api("/api/admin/password", { method: "POST", body: { current: $("#p0").value, next: $("#p1").value } }); C.mustChange = false; toast("เปลี่ยนรหัสผ่านแล้ว"); viewAdmin(); } catch (e) { $("#perr").textContent = e.message; }
+    }; } };
   }
-  var HINT = { iPhone: { spec: "- 256GB 512GB 1TB 2TB", extra: "" }, iPad: { spec: "Wi-Fi / Cellular · 128GB 256GB", extra: "11\" / 13\"" }, Watch: { spec: "GPS / Cell", extra: "S/M - M/L\n40\" / 44\"" } };
-  function editor(t, cat) {
-    var e = t ? JSON.parse(JSON.stringify(t)) : { id: null, category: cat || "iPhone", name: "", data: { model: "", bold: false, spec: "", colors: [{ name: "", hex: "#3d4466" }], extra: "", logo: true, size: 1 }, active: true };
-    if (e.data.size == null) e.data.size = 1;
-    var b = modal("<h2>" + (e.id ? "แก้ไขเทมเพลต" : "เพิ่มเทมเพลต") + '</h2><div class="editor"><div>' +
-      '<div class="grid2">' + field("หมวด", '<select class="i" id="ecat">' + state.cfg.categories.map(function (c) { return "<option" + (c === e.category ? " selected" : "") + ">" + c + "</option>"; }).join("") + "</select>") +
-      field("ชื่อเทมเพลต (แสดงในรายการ)", '<input class="i" id="ename" value="' + esc(e.name) + '" placeholder="เว้นว่าง = ชื่อรุ่น">') + "</div>" +
-      '<div class="grid2">' + field("รุ่น (บรรทัดแรก)", '<input class="i" id="emodel" value="' + esc(e.data.model) + '" placeholder="เช่น iPhone 17 Pro">') +
-      field("ความจุ / รายละเอียด", '<input class="i" id="espec" value="' + esc(e.data.spec) + '">') + "</div>" +
-      '<label class="f">สี (แต่ละสีกำหนดสีตัวอักษรได้)</label><div class="colors" id="ecolors"></div><button class="btn sm ghost" id="addc">+ เพิ่มสี</button>' +
-      '<div class="field" style="margin-top:10px"><label class="f">บรรทัดเพิ่มเติม (สูงสุด 4 บรรทัด)</label><textarea class="i" id="eextra" rows="3">' + esc(e.data.extra) + "</textarea></div>" +
-      '<div class="row"><label><input type="checkbox" id="ebold"' + (e.data.bold ? " checked" : "") + '> ชื่อรุ่นตัวหนา</label><label><input type="checkbox" id="elogo"' + (e.data.logo ? " checked" : "") + '> แสดงโลโก้ SYNNEX</label>' +
-      '<label>ขนาดตัวอักษร <select class="i" id="esize" style="width:auto">' + ["เล็ก", "กลาง", "ใหญ่"].map(function (l, i) { return '<option value="' + i + '"' + (e.data.size === i ? " selected" : "") + ">" + l + "</option>"; }).join("") + "</select></label>" +
-      (e.id ? '<label><input type="checkbox" id="eactive"' + (e.active ? " checked" : "") + "> เปิดใช้งาน (แสดงที่หน้าสาขา)</label>" : "") + "</div>" +
-      '</div><div><label class="f">ตัวอย่างขนาดจริง</label><div class="bigpv" id="epv"></div><p class="small muted">ตัวอักษรย่ออัตโนมัติให้พอดีช่อง ' + L().cellW + " × " + L().cellH + " มม.</p></div></div>" +
-      '<div class="err" id="eerr"></div><div class="acts">' + (e.id ? '<button class="btn danger" id="edel">ลบเทมเพลต</button><span class="spacer"></span>' : "") + '<button class="btn ghost" id="ecancel">ยกเลิก</button><button class="btn" id="esave">บันทึก</button></div>');
-    function read() {
-      e.category = $("#ecat", b).value; e.name = $("#ename", b).value;
-      e.data.model = $("#emodel", b).value; e.data.spec = $("#espec", b).value; e.data.extra = $("#eextra", b).value;
-      e.data.bold = $("#ebold", b).checked; e.data.logo = $("#elogo", b).checked; e.data.size = Number($("#esize", b).value);
-      if ($("#eactive", b)) e.active = $("#eactive", b).checked;
-      e.data.colors = $$(".crow", b).map(function (r) { return { name: $(".cn", r).value, hex: $(".cc", r).value }; });
+  var A = null;   // admin catalog (incl. inactive)
+  async function viewAdmin() {
+    if (!C.admin) return loginView();
+    if (C.mustChange) { var pv = passwordView(true); setView(pv.html); return pv.bind(); }
+    try { A = await api("/api/admin/catalog"); } catch (e) { if (e.status === 401) { C.admin = false; return loginView(); } if (e.code === "mustchange") { C.mustChange = true; return viewAdmin(); } throw e; }
+    var tabs = [["products", "ข้อมูลสินค้า"], ["suppliers", "ซัพพลายเออร์"], ["template", "เทมเพลต"], ["paper", "ขนาดกระดาษ"], ["account", "บัญชี"]];
+    setView('<div class="row"><div><h1>ผู้ดูแลระบบ</h1><p class="sub">เฉพาะผู้ดูแลแก้ไขได้ — หน้าสาขาเลือกและพิมพ์ได้อย่างเดียว</p></div><span class="spacer"></span><button class="btn ghost" id="logout">ออกจากระบบ</button></div>' +
+      '<div class="tabs">' + tabs.map(function (t) { return '<button class="tab' + (ui.adminTab === t[0] ? " on" : "") + '" data-at="' + t[0] + '">' + t[1] + "</button>"; }).join("") + '</div><div id="atab"></div>');
+    $$("[data-at]").forEach(function (b) { b.onclick = function () { ui.adminTab = b.dataset.at; viewAdmin(); }; });
+    $("#logout").onclick = async function () { await api("/api/admin/logout", { method: "POST", body: {} }); C.admin = false; location.hash = "#/"; };
+    ({ products: adminProducts, suppliers: adminSuppliers, template: adminTemplate, paper: adminPaper, account: adminAccount })[ui.adminTab]();
+  }
+  async function refresh() { var adm = C && C.admin; C = await api("/api/catalog"); if (adm && !C.admin) C.admin = false; applyPageSize(); }
+  function act(fn) { return async function () { try { await fn.apply(this, arguments); } catch (e) { if (e.status === 401) { C.admin = false; return loginView(); } alert(e.message); } }; }
+
+  // --- product data
+  function adminProducts() {
+    var ms = A.models.filter(function (m) { return m.category === ui.adminCat; });
+    $("#atab").innerHTML = '<div class="tabs">' + A.categories.map(function (c) { return '<button class="tab sm' + (ui.adminCat === c ? " on" : "") + '" data-ac="' + c + '">' + c + " (" + A.models.filter(function (m) { return m.category === c; }).length + ")</button>"; }).join("") + "</div>" +
+      '<div class="card"><div class="row"><b>รุ่น ' + ui.adminCat + '</b><span class="spacer"></span><input class="i" id="newm" placeholder="ชื่อรุ่นใหม่" style="width:220px"><button class="btn" id="addm">+ เพิ่มรุ่น</button></div>' +
+      '<p class="small muted">ความจุและสีของแต่ละรุ่น เพิ่มเองได้ที่ปุ่ม "แก้ไข" — หน้าสาขาจะแสดงเฉพาะที่กำหนดไว้</p><div class="list">' +
+      (ms.length ? ms.map(function (m, i) {
+        return '<div class="it' + (m.active ? "" : " off") + '"><div class="main"><b>' + esc(m.name) + "</b>" + (m.active ? "" : ' <span class="small muted">(ซ่อน)</span>') +
+          '<div class="small">' + (m.capacities.length ? m.capacities.map(esc).join(" · ") : '<span class="warn">ยังไม่มีความจุ</span>') + " &nbsp;|&nbsp; " +
+          (m.colors.length ? m.colors.map(function (c) { return '<span class="sw" style="background:' + esc(c.hex) + '"></span>' + esc(c.name); }).join(" ") : '<span class="warn">ยังไม่มีสี</span>') + "</div></div>" +
+          '<button class="btn sm ghost" data-mu="' + m.id + '"' + (i ? "" : " disabled") + '>▲</button><button class="btn sm ghost" data-md="' + m.id + '"' + (i < ms.length - 1 ? "" : " disabled") + '>▼</button><button class="btn sm" data-me="' + m.id + '">แก้ไข</button></div>';
+      }).join("") : '<div class="muted small">ยังไม่มีรุ่นในหมวดนี้</div>') + "</div></div>";
+    $$("[data-ac]").forEach(function (b) { b.onclick = function () { ui.adminCat = b.dataset.ac; adminProducts(); }; });
+    $("#addm").onclick = act(async function () { var n = $("#newm").value.trim(); if (!n) return; await api("/api/admin/models", { method: "POST", body: { category: ui.adminCat, name: n } }); await refresh(); await viewAdmin(); });
+    $$("[data-mu],[data-md]").forEach(function (b) { b.onclick = act(async function () { await api("/api/admin/models/" + (b.dataset.mu || b.dataset.md) + "/move", { method: "POST", body: { dir: b.dataset.mu ? "up" : "down" } }); await refresh(); await viewAdmin(); }); });
+    $$("[data-me]").forEach(function (b) { b.onclick = function () { modelEditor(A.models.find(function (m) { return m.id === Number(b.dataset.me); })); }; });
+  }
+  var CAP_SUGGEST = ["64GB", "128GB", "256GB", "512GB", "1TB", "2TB"];
+  function modelEditor(m) {
+    var e = JSON.parse(JSON.stringify(m));
+    var b = modal("<h2>แก้ไขรุ่น</h2>" + '<div class="grid2">' + field("ชื่อรุ่น", '<input class="i" id="mn" value="' + esc(e.name) + '">') +
+      field("คัดลอกความจุ/สีจากรุ่นอื่น", '<select class="i" id="mcopy"><option value="">— เลือกรุ่น —</option>' + A.models.filter(function (x) { return x.id !== e.id && x.category === e.category && (x.capacities.length || x.colors.length); }).map(function (x) { return '<option value="' + x.id + '">' + esc(x.name) + "</option>"; }).join("") + "</select>") + "</div>" +
+      '<label class="f">ความจุ (ตัวเลือกขั้นที่ 2)</label><div class="chips" id="mcaps"></div><div class="row" style="margin:6px 0 12px"><input class="i" id="mcap" placeholder="เช่น 256GB" style="width:150px"><button class="btn sm" id="mcapadd">เพิ่ม</button><span class="small muted">หรือกด:</span>' + CAP_SUGGEST.map(function (c) { return '<button class="btn sm ghost" data-cs="' + c + '">' + c + "</button>"; }).join("") + "</div>" +
+      '<label class="f">สีเครื่อง (ตัวเลือกขั้นที่ 3 · ใช้เป็นสีตัวอักษรบนสติ๊กเกอร์ได้)</label><div id="mcols"></div><button class="btn sm ghost" id="mcoladd">+ เพิ่มสี</button>' +
+      '<div class="row" style="margin-top:12px"><label><input type="checkbox" id="mact"' + (e.active ? " checked" : "") + "> แสดงที่หน้าสาขา</label></div>" +
+      '<div class="err" id="merr"></div><div class="acts"><button class="btn danger" id="mdel">ลบรุ่น</button><span class="spacer"></span><button class="btn ghost" id="mx">ยกเลิก</button><button class="btn" id="ms">บันทึก</button></div>');
+    function readCols() { e.colors = $$(".crow", b).map(function (r) { return { name: $(".cn", r).value, hex: $(".cc", r).value }; }); }
+    function draw() {
+      $("#mcaps", b).innerHTML = e.capacities.length ? e.capacities.map(function (c, i) { return '<span class="chip">' + esc(c) + ' <button class="x" data-cx="' + i + '">×</button></span>'; }).join("") : '<span class="muted small">ยังไม่มี</span>';
+      $("#mcols", b).innerHTML = e.colors.map(function (c, i) { return '<div class="crow"><input class="i cn" value="' + esc(c.name) + '" placeholder="ชื่อสี เช่น Natural Titanium"><input type="color" class="cc" value="' + esc(c.hex) + '"><button class="x" data-kx="' + i + '">×</button></div>'; }).join("");
+      $$("[data-cx]", b).forEach(function (x) { x.onclick = function () { e.capacities.splice(Number(x.dataset.cx), 1); draw(); }; });
+      $$("[data-kx]", b).forEach(function (x) { x.onclick = function () { readCols(); e.colors.splice(Number(x.dataset.kx), 1); draw(); }; });
     }
-    function drawColors() {
-      $("#ecolors", b).innerHTML = e.data.colors.map(function (c, i) { return '<div class="crow"><input class="i cn" value="' + esc(c.name) + '" placeholder="ชื่อสี เช่น Night Sky"><input type="color" class="cc" value="' + esc(c.hex || "#1d1d1f") + '"><button class="x" data-rc="' + i + '" title="ลบสี">×</button></div>'; }).join("");
-      $$(".cn,.cc", b).forEach(function (i) { i.oninput = preview; });
-      $$("[data-rc]", b).forEach(function (x) { x.onclick = function () { read(); e.data.colors.splice(Number(x.dataset.rc), 1); drawColors(); preview(); }; });
-    }
-    function placeholders() { var h = HINT[$("#ecat", b).value] || {}; $("#espec", b).placeholder = h.spec || ""; $("#eextra", b).placeholder = h.extra ? "เช่น " + h.extra.replace("\n", " / ") : ""; }
-    function preview() { read(); var d = Object.assign({}, e.data, { model: e.data.model || "ชื่อรุ่น", colors: e.data.colors.filter(function (c) { return c.name; }) }); $("#epv", b).innerHTML = stickerHTML(d); fitWhenReady($("#epv", b)); }
-    drawColors(); placeholders(); preview();
-    ["#ecat", "#ename", "#emodel", "#espec", "#eextra", "#ebold", "#elogo", "#esize"].forEach(function (s) { $(s, b).addEventListener("input", preview); $(s, b).addEventListener("change", preview); });
-    $("#ecat", b).addEventListener("change", placeholders);
-    $("#addc", b).onclick = function () { read(); e.data.colors.push({ name: "", hex: "#1d1d1f" }); drawColors(); $$(".cn", b).slice(-1)[0].focus(); };
-    $("#ecancel", b).onclick = closeModal;
-    $("#esave", b).onclick = async function () {
-      read(); this.disabled = true;
-      var body = { category: e.category, name: e.name, data: e.data, active: e.active };
-      try { if (e.id) await api("/api/admin/templates/" + e.id, { method: "PUT", body: body }); else await api("/api/admin/templates", { method: "POST", body: body }); closeModal(); toast("บันทึกเทมเพลตแล้ว"); await reloadCfg(); viewAdmin(); }
-      catch (er) { $("#eerr", b).textContent = er.message; this.disabled = false; }
-    };
-    if ($("#edel", b)) $("#edel", b).onclick = async function () { if (!confirm("ลบเทมเพลต \"" + e.name + "\"?")) return; await api("/api/admin/templates/" + e.id, { method: "DELETE" }); closeModal(); toast("ลบแล้ว"); await reloadCfg(); viewAdmin(); };
+    draw();
+    var addCap = function (v) { v = String(v || "").trim(); if (v && e.capacities.indexOf(v) === -1) e.capacities.push(v); draw(); };
+    $("#mcapadd", b).onclick = function () { addCap($("#mcap", b).value); $("#mcap", b).value = ""; };
+    $("#mcap", b).addEventListener("keydown", function (ev) { if (ev.key === "Enter") { addCap(this.value); this.value = ""; } });
+    $$("[data-cs]", b).forEach(function (x) { x.onclick = function () { addCap(x.dataset.cs); }; });
+    $("#mcoladd", b).onclick = function () { readCols(); e.colors.push({ name: "", hex: "#000000" }); draw(); $$(".cn", b).slice(-1)[0].focus(); };
+    $("#mcopy", b).onchange = function () { var id = Number(this.value), src = A.models.find(function (x) { return x.id === id; }); if (!src) return; e.capacities = src.capacities.slice(); e.colors = JSON.parse(JSON.stringify(src.colors)); draw(); };
+    $("#mx", b).onclick = closeModal;
+    $("#ms", b).onclick = act(async function () { readCols(); await api("/api/admin/models/" + e.id, { method: "PUT", body: { name: $("#mn", b).value, active: $("#mact", b).checked, capacities: e.capacities, colors: e.colors } }); closeModal(); toast("บันทึกแล้ว"); await refresh(); viewAdmin(); });
+    $("#mdel", b).onclick = act(async function () { if (!confirm("ลบรุ่น " + e.name + " พร้อมความจุและสีทั้งหมด?")) return; await api("/api/admin/models/" + e.id, { method: "DELETE" }); closeModal(); await refresh(); viewAdmin(); });
   }
 
-  /* ---------- admin: sheet calibration ---------- */
-  function viewSettings() {
-    if (!state.cfg.admin) return loginView(viewSettings);
-    var lay = L();
-    var F = [["cols", "จำนวนคอลัมน์ (แนวนอน)"], ["rows", "จำนวนแถว (แนวตั้ง)"], ["cellW", "ความกว้างช่อง (มม.)"], ["cellH", "ความสูงช่อง (มม.)"], ["marginTop", "ขอบบน (มม.)"], ["marginLeft", "ขอบซ้าย (มม.)"], ["gapX", "ระยะห่างแนวนอน (มม.)"], ["gapY", "ระยะห่างแนวตั้ง (มม.)"], ["offsetX", "เลื่อนทั้งแผ่น ซ้าย(−)/ขวา(+) มม."], ["offsetY", "เลื่อนทั้งแผ่น ขึ้น(−)/ลง(+) มม."], ["padding", "ระยะขอบในช่อง (มม.)"]];
-    setView('<h1>ตั้งค่ากระดาษ</h1><p class="sub">ค่าเริ่มต้น: A4 แนวตั้ง 5 × 10 = 50 ช่อง ช่องละ 42 × 27.9 มม. (กว้าง 4.2 ซม. · สูง 2.79 ซม.) — ใช้ปรับให้ตรงกับกระดาษสติ๊กเกอร์และเครื่องพิมพ์</p>' +
-      '<div class="layout"><div class="card"><div class="grid4">' + F.map(function (f) { return field(f[1], '<input class="i" type="number" step="0.1" id="l_' + f[0] + '" value="' + lay[f[0]] + '">'); }).join("") + "</div>" +
-      '<label><input type="checkbox" id="l_showBorders"' + (lay.showBorders ? " checked" : "") + '> พิมพ์เส้นขอบช่อง (สำหรับกระดาษธรรมดา)</label>' +
-      '<div class="err" id="lerr"></div><div class="row"><button class="btn" id="lsave">บันทึก</button><button class="btn ghost" id="ltest">พิมพ์หน้าทดสอบ (กรอบ + เลขช่อง)</button><button class="btn ghost" id="lreset">คืนค่าเริ่มต้น</button></div>' +
-      '<div class="note" style="margin-top:12px"><b>วิธีปรับให้ตรงกระดาษ:</b> พิมพ์หน้าทดสอบลงกระดาษ A4 ธรรมดา (สเกล 100%) → วางทาบกับกระดาษสติ๊กเกอร์ส่องกับไฟ → ถ้ากรอบเลื่อนทั้งแผ่น ให้ปรับ "เลื่อนทั้งแผ่น" / ถ้าค่อยๆ เลื่อนทีละแถว ให้ปรับขนาดช่องหรือระยะห่าง → บันทึก แล้วทดสอบอีกครั้ง</div></div>' +
-      '<div class="card"><b>ตัวอย่าง</b><div class="sheetwrap" id="lpv"></div></div></div>');
-    function read() { var v = {}; F.forEach(function (f) { v[f[0]] = Number($("#l_" + f[0]).value); }); v.showBorders = $("#l_showBorders").checked; return v; }
-    function pv() { var saved = state.cfg.layout; state.cfg.layout = Object.assign({}, saved, read()); $("#lpv").innerHTML = buildSheets([], 1, { borders: true, numbers: true })[0]; scaleSheets($("#lpv").parentNode, $("#lpv").parentNode.clientWidth - 34); state.cfg.layout = saved; }
-    $$("input", $("#app")).forEach(function (i) { i.addEventListener("input", pv); });
-    pv();
-    $("#lsave").onclick = async function () { try { state.cfg.layout = await api("/api/admin/layout", { method: "PUT", body: read() }); toast("บันทึกแล้ว"); $("#lerr").textContent = ""; } catch (e) { if (e.status === 401) { state.cfg.admin = false; return loginView(viewSettings); } $("#lerr").textContent = e.message; } };
-    $("#ltest").onclick = function () { var saved = state.cfg.layout; state.cfg.layout = Object.assign({}, saved, read()); var h = buildSheets([], 1, { borders: true, numbers: true }); state.cfg.layout = saved; printSheets(h); };
-    $("#lreset").onclick = function () { var d = { cols: 5, rows: 10, cellW: 42, cellH: 27.9, marginTop: 9, marginLeft: 0, gapX: 0, gapY: 0, offsetX: 0, offsetY: 0, padding: 1.2 }; Object.keys(d).forEach(function (k) { $("#l_" + k).value = d[k]; }); pv(); };
+  // --- suppliers
+  function adminSuppliers() {
+    $("#atab").innerHTML = '<div class="card"><div class="row"><b>ซัพพลายเออร์ (ขั้นที่ 4)</b><span class="spacer"></span><input class="i" id="news" placeholder="ชื่อซัพพลายเออร์" style="width:200px"><button class="btn" id="adds">+ เพิ่ม</button></div>' +
+      '<p class="small muted">มีโลโก้ → แสดงโลโก้บนสติ๊กเกอร์ · ไม่มีโลโก้ → แสดงชื่อเป็นตัวอักษร</p><div class="list">' + A.suppliers.map(function (s, i) {
+        return '<div class="it' + (s.active ? "" : " off") + '"><div class="slogo">' + (s.logo ? '<img src="' + esc(s.logo) + "?t=" + Date.now() + '" alt="">' : '<span class="muted small">ไม่มีโลโก้</span>') + '</div><div class="main"><input class="i" value="' + esc(s.name) + '" data-sn="' + s.id + '" style="max-width:220px"> <label class="small"><input type="checkbox" data-sa="' + s.id + '"' + (s.active ? " checked" : "") + '> แสดงที่หน้าสาขา</label></div>' +
+          '<label class="btn sm ghost">อัปโหลดโลโก้<input type="file" accept="image/png,image/jpeg,image/webp" data-sl="' + s.id + '" hidden></label>' + (s.logo ? '<button class="btn sm ghost" data-slx="' + s.id + '">ลบโลโก้</button>' : "") +
+          '<button class="btn sm ghost" data-su="' + s.id + '"' + (i ? "" : " disabled") + '>▲</button><button class="btn sm ghost" data-sd="' + s.id + '"' + (i < A.suppliers.length - 1 ? "" : " disabled") + '>▼</button><button class="btn sm danger" data-sx="' + s.id + '">ลบ</button></div>';
+      }).join("") + "</div></div>";
+    var save = act(async function (id) { await api("/api/admin/suppliers/" + id, { method: "PUT", body: { name: $('[data-sn="' + id + '"]').value, active: $('[data-sa="' + id + '"]').checked } }); toast("บันทึกแล้ว"); await refresh(); });
+    $$("[data-sn]").forEach(function (i) { i.onchange = function () { save(i.dataset.sn); }; });
+    $$("[data-sa]").forEach(function (i) { i.onchange = function () { save(i.dataset.sa); }; });
+    $("#adds").onclick = act(async function () { var n = $("#news").value.trim(); if (!n) return; await api("/api/admin/suppliers", { method: "POST", body: { name: n } }); await refresh(); viewAdmin(); });
+    $$("[data-sl]").forEach(function (i) { i.onchange = act(async function () { var fd = new FormData(); fd.append("logo", i.files[0]); await api("/api/admin/suppliers/" + i.dataset.sl + "/logo", { method: "POST", body: fd }); toast("อัปโหลดโลโก้แล้ว"); await refresh(); viewAdmin(); }); });
+    $$("[data-slx]").forEach(function (b) { b.onclick = act(async function () { await api("/api/admin/suppliers/" + b.dataset.slx + "/logo", { method: "DELETE" }); await refresh(); viewAdmin(); }); });
+    $$("[data-su],[data-sd]").forEach(function (b) { b.onclick = act(async function () { await api("/api/admin/suppliers/" + (b.dataset.su || b.dataset.sd) + "/move", { method: "POST", body: { dir: b.dataset.su ? "up" : "down" } }); await refresh(); viewAdmin(); }); });
+    $$("[data-sx]").forEach(function (b) { b.onclick = act(async function () { if (!confirm("ลบซัพพลายเออร์นี้?")) return; await api("/api/admin/suppliers/" + b.dataset.sx, { method: "DELETE" }); await refresh(); viewAdmin(); }); });
   }
+
+  // --- template designer
+  var EL_LABEL = { model: "รุ่น", capacity: "ความจุ", color: "สีเครื่อง", supplier: "ซัพพลายเออร์", text: "ข้อความคงที่" };
+  function adminTemplate() {
+    var t = JSON.parse(JSON.stringify(A.templates[ui.tplCat]));
+    var sm = A.models.filter(function (m) { return m.category === ui.tplCat; });
+    var sample = (sm.find(function (m) { return m.capacities.length && m.colors.length; }) || sm[0] || {}).id;
+    $("#atab").innerHTML = '<div class="tabs">' + A.categories.map(function (c) { return '<button class="tab sm' + (ui.tplCat === c ? " on" : "") + '" data-tc="' + c + '">เทมเพลต ' + c + "</button>"; }).join("") + "</div>" +
+      '<div class="editor"><div class="card"><div class="grid4">' + field("ระยะขอบในช่อง (มม.)", '<input class="i" type="number" step="0.1" id="tpad" value="' + t.padding + '">') +
+      field("แนวตั้ง", '<select class="i" id="tval"><option value="center"' + (t.valign === "center" ? " selected" : "") + '>กึ่งกลาง</option><option value="top"' + (t.valign === "top" ? " selected" : "") + ">ชิดบน</option></select>") +
+      field("ระยะบรรทัด", '<input class="i" type="number" step="0.05" id="tlh" value="' + t.lineHeight + '">') + "</div>" +
+      '<div id="tels"></div><div class="row"><select class="i" id="tnew" style="width:auto">' + Object.keys(EL_LABEL).map(function (k) { return '<option value="' + k + '">' + EL_LABEL[k] + "</option>"; }).join("") + '</select><button class="btn sm ghost" id="tadd">+ เพิ่มบรรทัด</button></div>' +
+      '<div class="err" id="terr"></div><div class="row"><button class="btn" id="tsave">บันทึกเทมเพลต</button><span class="small muted">บันทึกแล้วหน้าสาขาใช้ทันที</span></div></div>' +
+      '<div class="card"><b>ตัวอย่าง</b><div class="grid2" style="margin-top:8px">' +
+      field("รุ่นตัวอย่าง", '<select class="i" id="smod">' + sm.map(function (m) { return '<option value="' + m.id + '"' + (m.id === sample ? " selected" : "") + ">" + esc(m.name) + "</option>"; }).join("") + "</select>") +
+      field("ซัพพลายเออร์", '<select class="i" id="ssup">' + A.suppliers.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + "</option>"; }).join("") + "</select>") + "</div>" +
+      '<div class="pvbox"><div class="zoom3" id="tpv"></div></div><div class="center small muted">ขยาย 3 เท่า · ขนาดจริง ' + L().cellW + " × " + L().cellH + ' มม.</div><div class="pvbox" id="tpv1"></div><div class="center small muted">ขนาดจริง</div><div class="err" id="tover"></div></div></div>';
+    $$("[data-tc]").forEach(function (b) { b.onclick = function () { ui.tplCat = b.dataset.tc; adminTemplate(); }; });
+    function sampleVals() {
+      var mid = Number($("#smod") ? $("#smod").value : 0), sid = Number($("#ssup") ? $("#ssup").value : 0);
+      var m = A.models.find(function (x) { return x.id === mid; }) || { name: "ชื่อรุ่น", capacities: [], colors: [] };
+      var s = A.suppliers.find(function (x) { return x.id === sid; }) || { name: "Supplier" };
+      return { model: m.name, capacity: m.capacities[0] || "256GB", color: m.colors[0] || { name: "สีตัวอย่าง", hex: "#3d4466" }, supplier: { name: s.name, logo: s.logo } };
+    }
+    function drawEls() {
+      $("#tels").innerHTML = t.elements.map(function (e, i) {
+        return '<div class="tel"><div class="row"><b>' + (i + 1) + ". " + EL_LABEL[e.type] + '</b><span class="spacer"></span><button class="btn sm ghost" data-eu="' + i + '"' + (i ? "" : " disabled") + '>▲</button><button class="btn sm ghost" data-ed="' + i + '"' + (i < t.elements.length - 1 ? "" : " disabled") + '>▼</button><button class="x" data-ex="' + i + '">×</button></div>' +
+          '<div class="grid4">' +
+          (e.type === "text" ? field("ข้อความ", '<input class="i" data-k="text" data-i="' + i + '" value="' + esc(e.text || "") + '">') : "") +
+          (e.type === "supplier" ? field("ความสูงโลโก้ (มม.)", '<input class="i" type="number" step="0.1" data-k="logoH" data-i="' + i + '" value="' + e.logoH + '">') : "") +
+          field("ฟอนต์", '<select class="i" data-k="font" data-i="' + i + '">' + A.fonts.map(function (f) { return "<option" + (f === e.font ? " selected" : "") + ">" + f + "</option>"; }).join("") + "</select>") +
+          field("ขนาด (pt)", '<input class="i" type="number" step="0.5" data-k="size" data-i="' + i + '" value="' + e.size + '">') +
+          field("สีตัวอักษร", '<input type="color" class="i cpick" data-k="color" data-i="' + i + '" value="' + e.color + '">' + (e.type === "color" ? '<label class="small"><input type="checkbox" data-k="useItemColor" data-i="' + i + '"' + (e.useItemColor ? " checked" : "") + "> ใช้สีของสีเครื่อง</label>" : "")) +
+          field("จัดวาง", '<select class="i" data-k="align" data-i="' + i + '">' + [["left", "ชิดซ้าย"], ["center", "กึ่งกลาง"], ["right", "ชิดขวา"]].map(function (a) { return '<option value="' + a[0] + '"' + (a[0] === e.align ? " selected" : "") + ">" + a[1] + "</option>"; }).join("") + "</select>") +
+          field("ระยะห่างด้านบน (มม.)", '<input class="i" type="number" step="0.1" data-k="mt" data-i="' + i + '" value="' + e.mt + '">') +
+          (e.type !== "supplier" && e.type !== "text" ? field("ข้อความหน้า", '<input class="i" data-k="prefix" data-i="' + i + '" value="' + esc(e.prefix) + '" placeholder="เช่น - ">') + field("ข้อความท้าย", '<input class="i" data-k="suffix" data-i="' + i + '" value="' + esc(e.suffix) + '">') : "") +
+          '<div class="field"><label class="small"><input type="checkbox" data-k="bold" data-i="' + i + '"' + (e.bold ? " checked" : "") + '> ตัวหนา</label> <label class="small"><input type="checkbox" data-k="italic" data-i="' + i + '"' + (e.italic ? " checked" : "") + "> ตัวเอียง</label></div></div></div>";
+      }).join("");
+      $$("[data-k]", $("#tels")).forEach(function (inp) {
+        function upd() { var e = t.elements[Number(inp.dataset.i)], k = inp.dataset.k; e[k] = inp.type === "checkbox" ? inp.checked : inp.type === "number" ? Number(inp.value) : inp.value; preview(); }
+        inp.addEventListener("input", upd); inp.addEventListener("change", upd);
+      });
+      $$("[data-eu],[data-ed]", $("#tels")).forEach(function (bt) { bt.onclick = function () { var i = Number(bt.dataset.eu || bt.dataset.ed), j = i + (bt.dataset.eu ? -1 : 1); var x = t.elements[i]; t.elements[i] = t.elements[j]; t.elements[j] = x; drawEls(); preview(); }; });
+      $$("[data-ex]", $("#tels")).forEach(function (bt) { bt.onclick = function () { t.elements.splice(Number(bt.dataset.ex), 1); drawEls(); preview(); }; });
+    }
+    function preview() {
+      t.padding = Number($("#tpad").value); t.valign = $("#tval").value; t.lineHeight = Number($("#tlh").value);
+      var h = stickerHTML(t, sampleVals()); $("#tpv").innerHTML = h; $("#tpv1").innerHTML = h;
+      afterRender($("#atab"), function () { var o = $("#tpv1 .stk.over"); $("#tover").textContent = o ? "ข้อความยาวเกินช่อง — ลดขนาดตัวอักษรหรือระยะห่าง" : ""; });
+    }
+    drawEls(); preview();
+    ["#tpad", "#tval", "#tlh", "#smod", "#ssup"].forEach(function (s) { $(s).addEventListener("input", preview); $(s).addEventListener("change", preview); });
+    $("#tadd").onclick = function () { var ty = $("#tnew").value; t.elements.push({ type: ty, font: "Helvetica", size: 8, bold: false, italic: false, color: "#000000", align: "center", mt: 0.3, prefix: "", suffix: "", logoH: 2.6, useItemColor: true, text: ty === "text" ? "ข้อความ" : "" }); drawEls(); preview(); };
+    $("#tsave").onclick = act(async function () { preview(); await api("/api/admin/template/" + ui.tplCat, { method: "PUT", body: t }); toast("บันทึกเทมเพลตแล้ว"); await refresh(); A.templates = C.templates; });
+  }
+
+  // --- paper
+  function adminPaper() {
+    var l = L();
+    var F = [["pageW", "ความกว้างกระดาษ (มม.)"], ["pageH", "ความสูงกระดาษ (มม.)"], ["cols", "จำนวนคอลัมน์"], ["rows", "จำนวนแถว"], ["cellW", "ความกว้างสติ๊กเกอร์ (มม.)"], ["cellH", "ความสูงสติ๊กเกอร์ (มม.)"], ["marginTop", "ขอบบน (มม.)"], ["marginLeft", "ขอบซ้าย (มม.)"], ["gapX", "ระยะห่างแนวนอน (มม.)"], ["gapY", "ระยะห่างแนวตั้ง (มม.)"], ["offsetX", "เลื่อนทั้งแผ่น ซ้าย(−)/ขวา(+)"], ["offsetY", "เลื่อนทั้งแผ่น ขึ้น(−)/ลง(+)"]];
+    $("#atab").innerHTML = '<div class="layout"><div class="card"><div class="row" style="margin-bottom:8px"><span class="small">ขนาดกระดาษสำเร็จรูป:</span><button class="btn sm ghost" data-ps="210x297">A4 แนวตั้ง</button><button class="btn sm ghost" data-ps="297x210">A4 แนวนอน</button><button class="btn sm ghost" data-ps="148x210">A5 แนวตั้ง</button></div>' +
+      '<div class="grid4">' + F.map(function (f) { return field(f[1], '<input class="i" type="number" step="0.1" id="l_' + f[0] + '" value="' + l[f[0]] + '">'); }).join("") + "</div>" +
+      '<label><input type="checkbox" id="l_showBorders"' + (l.showBorders ? " checked" : "") + "> พิมพ์เส้นขอบสติ๊กเกอร์</label>" +
+      '<div class="err" id="lerr"></div><div class="row"><button class="btn" id="lsave">บันทึก</button><button class="btn ghost" id="ltest">พิมพ์หน้าทดสอบ (กรอบ + เลขช่อง)</button><button class="btn ghost" id="lreset">ค่าเริ่มต้น (A4 50 ช่อง)</button></div>' +
+      '<div class="note" style="margin-top:10px">พิมพ์หน้าทดสอบลงกระดาษธรรมดา (สเกล 100%) → วางทาบกระดาษสติ๊กเกอร์ → ถ้าเลื่อนทั้งแผ่นปรับ "เลื่อนทั้งแผ่น" / ถ้าค่อยๆ เลื่อนทีละแถวปรับขนาดหรือระยะห่าง</div></div>' +
+      '<div class="card"><b>ตัวอย่าง</b><div class="sheetwrap" id="lpv"></div></div></div>';
+    function read() { var v = {}; F.forEach(function (f) { v[f[0]] = Number($("#l_" + f[0]).value); }); v.showBorders = $("#l_showBorders").checked; return v; }
+    function withLayout(v, fn) { var s = C.layout; C.layout = Object.assign({}, s, v); try { return fn(); } finally { C.layout = s; } }
+    function pv() { withLayout(read(), function () { $("#lpv").innerHTML = buildSheets([], 1, { borders: true, numbers: true })[0]; scaleSheets($("#lpv").parentNode, $("#lpv").parentNode.clientWidth - 34); }); }
+    $$("input", $("#atab")).forEach(function (i) { i.addEventListener("input", pv); });
+    $$("[data-ps]").forEach(function (b) { b.onclick = function () { var p = b.dataset.ps.split("x"); $("#l_pageW").value = p[0]; $("#l_pageH").value = p[1]; pv(); }; });
+    pv();
+    $("#lsave").onclick = act(async function () { try { C.layout = await api("/api/admin/layout", { method: "PUT", body: read() }); applyPageSize(); $("#lerr").textContent = ""; toast("บันทึกแล้ว"); } catch (e) { if (e.status === 401) throw e; $("#lerr").textContent = e.message; } });
+    $("#ltest").onclick = function () { var v = read(), saved = C.layout; C.layout = Object.assign({}, saved, v); var h = buildSheets([], 1, { borders: true, numbers: true }); printSheets(h); C.layout = saved; };
+    $("#lreset").onclick = function () { var d = { pageW: 210, pageH: 297, cols: 5, rows: 10, cellW: 42, cellH: 27.9, marginTop: 9, marginLeft: 0, gapX: 0, gapY: 0, offsetX: 0, offsetY: 0 }; Object.keys(d).forEach(function (k) { $("#l_" + k).value = d[k]; }); pv(); };
+  }
+  function adminAccount() { var pv = passwordView(false); $("#atab").innerHTML = pv.html; pv.bind(); }
 
   /* ---------- routing ---------- */
-  async function reloadCfg() { var admin = state.cfg && state.cfg.admin; state.cfg = await api("/api/config"); state.cfg.admin = state.cfg.admin || false; return admin; }
   async function route() {
     closeModal(); renderNav();
-    var h = location.hash.split("?")[0] || "#/";
-    try {
-      if (h === "#/admin") return await viewAdmin();
-      if (h === "#/settings") return viewSettings();
-      return viewPrint();
-    } catch (e) { setView('<div class="card">' + esc(e.message) + "</div>"); }
+    var h = (location.hash || "#/").split("?")[0];
+    try { if (h === "#/admin") return await viewAdmin(); return viewPrint(); }
+    catch (e) { setView('<div class="card">' + esc(e.message) + "</div>"); }
   }
   window.addEventListener("hashchange", route);
-  window.addEventListener("resize", function () { if ((location.hash || "#/") === "#/") renderSide(); });
+  window.addEventListener("resize", function () { if ((location.hash || "#/") === "#/") renderQueue(); });
   window.addEventListener("afterprint", function () { $("#printArea").innerHTML = ""; });
-  reloadCfg().then(route).catch(function () { setView('<div class="card">เชื่อมต่อระบบไม่สำเร็จ กรุณารีเฟรช</div>'); });
+  refresh().then(route).catch(function () { setView('<div class="card">เชื่อมต่อระบบไม่สำเร็จ กรุณารีเฟรช</div>'); });
 })();
