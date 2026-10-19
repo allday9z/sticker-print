@@ -43,6 +43,8 @@
       else if (e.type === "capacity") text = v.capacity;
       else if (e.type === "color") { text = v.color && v.color.name; if (e.useItemColor && v.color && v.color.hex) color = v.color.hex; }
       else if (e.type === "text") text = e.text;
+      else if (e.type === "band") text = v.band;
+      else if (e.type === "bandOption") text = v.bandOption;
       var style = "font-family:" + (FONT_CSS[e.font] || FONT_CSS.Helvetica) + ";font-size:" + e.size + "pt;font-weight:" + (e.bold ? 700 : 400) + ";font-style:" + (e.italic ? "italic" : "normal") +
         ";text-align:" + e.align + ";margin-top:" + e.mt + "mm;line-height:" + tpl.lineHeight + ";color:" + color;
       if (e.type === "supplier") {
@@ -64,7 +66,7 @@
   }
   function valsOf(item) {
     var sup = C.suppliers.find(function (s) { return s.id === item.supplierId; }) || { name: item.supplierName, logo: null };
-    return { model: item.model, capacity: item.capacity, color: { name: item.color, hex: item.hex }, supplier: { name: sup.name, logo: sup.logo } };
+    return { model: item.model, capacity: item.capacity, color: { name: item.color, hex: item.hex }, band: item.band || "", bandOption: item.bandOption || "", supplier: { name: sup.name, logo: sup.logo } };
   }
   function tplFor(cat) { return C.templates[cat]; }
 
@@ -114,40 +116,61 @@
     $$("[data-cat]").forEach(function (b) { b.onclick = function () { ui.cat = b.dataset.cat; ui.sel = {}; persist(); viewPrint(); }; });
     renderSteps(); renderQueue();
   }
+  // Steps per category. iPhone / iPad: model → capacity → colour → supplier.
+  // Watch: model → case size → case colour → band (+ band option) → supplier.
+  // Colours / bands limited to some sizes only show for those sizes; suppliers only for their categories.
+  function suppliersFor(cat) { return C.suppliers.filter(function (x) { return !x.categories || x.categories.indexOf(cat) > -1; }); }
+  function fitsSize(x, size) { return !x.sizes || !x.sizes.length || x.sizes.indexOf(size) > -1; }
   function renderSteps() {
-    var s = ui.sel, models = modelsOf(ui.cat), m = models.find(function (x) { return x.id === s.modelId; });
-    function step(n, title, done, body, value) {
-      return '<div class="step' + (done ? " done" : "") + '"><div class="sh"><span class="sn">' + n + "</span><b>" + title + "</b>" + (value ? '<span class="sv">' + esc(value) + "</span>" : "") + "</div>" + body + "</div>";
+    var s = ui.sel, watch = ui.cat === "Watch", models = modelsOf(ui.cat), m = models.find(function (x) { return x.id === s.modelId; }), n = 0;
+    function step(title, done, body, value) {
+      return '<div class="step' + (done ? " done" : "") + '"><div class="sh"><span class="sn">' + (++n) + "</span><b>" + title + "</b>" + (value ? '<span class="sv">' + esc(value) + "</span>" : "") + "</div>" + body + "</div>";
     }
     var opts = function (items, key, cur, render) { return '<div class="opts">' + items.map(function (it, i) { return '<button class="opt' + (cur === i ? " on" : "") + '" data-' + key + '="' + i + '">' + render(it) + "</button>"; }).join("") + "</div>"; };
-    var h = step(1, "เลือกรุ่น " + ui.cat, !!m, opts(models, "m", m ? models.indexOf(m) : -1, function (x) { return esc(x.name); }), m && m.name);
+    var none = function (what) { return '<div class="empty-note">ยังไม่มีข้อมูล' + what + "ของรุ่นนี้ — กรุณาติดต่อผู้ดูแลระบบ</div>"; };
+    var colors = [], bands = [], band = null, sups = suppliersFor(ui.cat);
+    var h = step("เลือกรุ่น " + (watch ? "Apple Watch" : ui.cat), !!m, opts(models, "m", m ? models.indexOf(m) : -1, function (x) { return esc(x.name); }), m && m.name);
+    var ready = false;
     if (m) {
       var ci = s.capacity != null ? m.capacities.indexOf(s.capacity) : -1;
-      h += step(2, "เลือกความจุ", ci > -1, m.capacities.length ? opts(m.capacities, "c", ci, esc) : '<div class="empty-note">ยังไม่มีข้อมูลความจุของรุ่นนี้ — กรุณาติดต่อผู้ดูแลระบบ</div>', ci > -1 ? s.capacity : "");
+      h += step(watch ? "เลือกขนาดตัวเรือน (Case Size)" : "เลือกความจุ", ci > -1, m.capacities.length ? opts(m.capacities, "c", ci, esc) : none(watch ? "ขนาดตัวเรือน" : "ความจุ"), ci > -1 ? s.capacity : "");
       if (ci > -1) {
-        var ki = s.color != null ? m.colors.findIndex(function (c) { return c.name === s.color; }) : -1;
-        h += step(3, "เลือกสีเครื่อง", ki > -1, m.colors.length ? opts(m.colors, "k", ki, function (c) { return '<span class="sw" style="background:' + esc(c.hex) + '"></span>' + esc(c.name); }) : '<div class="empty-note">ยังไม่มีข้อมูลสีของรุ่นนี้ — กรุณาติดต่อผู้ดูแลระบบ</div>', ki > -1 ? s.color : "");
-        if (ki > -1) {
-          var si = C.suppliers.findIndex(function (x) { return x.id === s.supplierId; });
-          h += step(4, "เลือก Supplier", si > -1, C.suppliers.length ? opts(C.suppliers, "s", si, function (x) { return x.logo ? '<img src="' + esc(x.logo) + '" alt="' + esc(x.name) + '" class="olg"><span class="small">' + esc(x.name) + "</span>" : esc(x.name); }) : '<div class="empty-note">ยังไม่มีซัพพลายเออร์</div>', si > -1 ? C.suppliers[si].name : "");
+        colors = m.colors.filter(function (c) { return fitsSize(c, s.capacity); });
+        var ki = s.color != null ? colors.findIndex(function (c) { return c.name === s.color; }) : -1;
+        h += step(watch ? "เลือกสีตัวเรือน (Case Color)" : "เลือกสีเครื่อง", ki > -1, colors.length ? opts(colors, "k", ki, function (c) { return '<span class="sw" style="background:' + esc(c.hex) + '"></span>' + esc(c.name); }) : none(watch ? "สีตัวเรือน (ขนาดนี้)" : "สี"), ki > -1 ? s.color : "");
+        ready = ki > -1;
+        if (ready && watch) {
+          bands = (m.bands || []).filter(function (b) { return fitsSize(b, s.capacity); });
+          var bi = s.band != null ? bands.findIndex(function (b) { return b.name === s.band; }) : -1;
+          band = bi > -1 ? bands[bi] : null;
+          h += step("เลือกประเภทสาย (Band Type)", !!band && (!band.options.length || !!s.bandOption), bands.length ? opts(bands, "b", bi, function (b) { return esc(b.name); }) : none("ประเภทสาย (ขนาดนี้)"), band ? band.name + (s.bandOption ? " · " + s.bandOption : "") : "");
+          if (band && band.options.length) h += '<div class="substep"><span class="small muted">ตัวเลือกของ ' + esc(band.name) + ":</span>" + opts(band.options, "bo", band.options.indexOf(s.bandOption), esc) + "</div>";
+          ready = !!band && (!band.options.length || band.options.indexOf(s.bandOption) > -1);
+        }
+        if (ready) {
+          var si = sups.findIndex(function (x) { return x.id === s.supplierId; });
+          h += step("เลือก Supplier", si > -1, sups.length ? opts(sups, "s", si, function (x) { return x.logo ? '<img src="' + esc(x.logo) + '" alt="' + esc(x.name) + '" class="olg"><span class="small">' + esc(x.name) + "</span>" : esc(x.name); }) : '<div class="empty-note">ยังไม่มีซัพพลายเออร์สำหรับหมวดนี้</div>', si > -1 ? sups[si].name : "");
         }
       }
     }
     $("#steps").innerHTML = h;
-    $$("[data-m]").forEach(function (b) { b.onclick = function () { var x = models[Number(b.dataset.m)]; ui.sel = { modelId: x.id }; renderSteps(); }; });
+    $$("[data-m]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: models[Number(b.dataset.m)].id }; renderSteps(); }; });
     $$("[data-c]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: m.id, capacity: m.capacities[Number(b.dataset.c)] }; renderSteps(); }; });
-    $$("[data-k]").forEach(function (b) { b.onclick = function () { var c = m.colors[Number(b.dataset.k)]; ui.sel = { modelId: m.id, capacity: s.capacity, color: c.name, hex: c.hex }; renderSteps(); }; });
-    $$("[data-s]").forEach(function (b) { b.onclick = function () { ui.sel.supplierId = C.suppliers[Number(b.dataset.s)].id; renderSteps(); }; });
+    $$("[data-k]").forEach(function (b) { b.onclick = function () { var c = colors[Number(b.dataset.k)]; ui.sel = { modelId: m.id, capacity: s.capacity, color: c.name, hex: c.hex }; renderSteps(); }; });
+    $$("[data-b]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: m.id, capacity: s.capacity, color: s.color, hex: s.hex, band: bands[Number(b.dataset.b)].name }; renderSteps(); }; });
+    $$("[data-bo]").forEach(function (b) { b.onclick = function () { ui.sel.bandOption = band.options[Number(b.dataset.bo)]; delete ui.sel.supplierId; renderSteps(); }; });
+    $$("[data-s]").forEach(function (b) { b.onclick = function () { ui.sel.supplierId = sups[Number(b.dataset.s)].id; renderSteps(); }; });
     renderPreview();
   }
   function currentItem() {
-    var s = ui.sel, m = C.models.find(function (x) { return x.id === s.modelId; }), sup = C.suppliers.find(function (x) { return x.id === s.supplierId; });
+    var s = ui.sel, m = C.models.find(function (x) { return x.id === s.modelId; }), sup = suppliersFor(ui.cat).find(function (x) { return x.id === s.supplierId; });
     if (!m || s.capacity == null || s.color == null || !sup) return null;
-    return { cat: ui.cat, model: m.name, capacity: s.capacity, color: s.color, hex: s.hex, supplierId: sup.id, supplierName: sup.name };
+    if (ui.cat === "Watch") { var b = (m.bands || []).find(function (x) { return x.name === s.band; }); if (!b || (b.options.length && b.options.indexOf(s.bandOption) === -1)) return null; }
+    return { cat: ui.cat, model: m.name, capacity: s.capacity, color: s.color, hex: s.hex, band: s.band || "", bandOption: s.bandOption || "", supplierId: sup.id, supplierName: sup.name };
   }
   function renderPreview() {
     var it = currentItem(), pv = $("#pv");
-    if (!it) { pv.innerHTML = '<div class="muted">ตัวอย่างสติ๊กเกอร์จะแสดงเมื่อเลือกครบ 4 ขั้นตอน</div>'; return; }
+    if (!it) { pv.innerHTML = '<div class="muted">ตัวอย่างสติ๊กเกอร์จะแสดงเมื่อเลือกครบทุกขั้นตอน</div>'; return; }
     pv.innerHTML = '<div class="row"><b>ตัวอย่างสติ๊กเกอร์</b><span class="spacer"></span><span class="small muted">ขนาดจริง ' + L().cellW + " × " + L().cellH + ' มม. (แสดงขยาย 2 เท่า)</span></div>' +
       '<div class="pvbox"><div class="zoom2">' + stickerHTML(tplFor(it.cat), valsOf(it)) + "</div></div>" +
       '<div class="row" style="justify-content:center"><label>จำนวน</label><div class="qty"><button id="qm">−</button><input class="i" type="number" min="1" max="500" id="qn" value="' + ui.qty + '"><button id="qp">+</button></div>' +
@@ -157,9 +180,9 @@
     $("#qm").onclick = function () { setQ(ui.qty - 1); }; $("#qp").onclick = function () { setQ(ui.qty + 1); }; $("#qn").oninput = function () { setQ(this.value); };
     $("#qfill").onclick = function () { var per = L().cols * L().rows, used = (ui.start - 1 + totalQty()) % per; setQ(per - used || per); };
     $("#add").onclick = function () {
-      var key = JSON.stringify([it.cat, it.model, it.capacity, it.color, it.supplierId]), ex = ui.queue.find(function (q) { return q.key === key; });
+      var key = JSON.stringify([it.cat, it.model, it.capacity, it.color, it.band, it.bandOption, it.supplierId]), ex = ui.queue.find(function (q) { return q.key === key; });
       if (ex) ex.qty += ui.qty; else ui.queue.push(Object.assign({ key: key, qty: ui.qty }, it));
-      persist(); toast("เพิ่ม " + ui.qty + " ดวง: " + it.model + " " + it.capacity + " " + it.color); renderQueue();
+      persist(); toast("เพิ่ม " + ui.qty + " ดวง: " + [it.model, it.capacity, it.color, it.band, it.bandOption].filter(Boolean).join(" ")); renderQueue();
     };
   }
   function totalQty() { return ui.queue.reduce(function (a, q) { return a + q.qty; }, 0); }
@@ -170,7 +193,7 @@
     var list = queueList(), sheets = buildSheets(list, ui.start, { pick: true, borders: true });
     box.innerHTML = '<div class="row"><b>รายการที่จะพิมพ์</b><span class="spacer"></span><span><b>' + list.length + "</b> ดวง · <b>" + (list.length ? sheets.length : 0) + "</b> แผ่น</span></div>" +
       (ui.queue.length ? '<div class="ql">' + ui.queue.map(function (q, i) {
-        return '<div class="qi"><div class="qt"><b>' + esc(q.model) + "</b> " + esc(q.capacity) + " · " + esc(q.color) + '<div class="small muted">' + esc(q.supplierName) + '</div></div><input class="i" type="number" min="1" max="500" value="' + q.qty + '" data-qq="' + i + '"><button class="x" data-qx="' + i + '" title="ลบ">×</button></div>';
+        return '<div class="qi"><div class="qt"><b>' + esc(q.model) + "</b> " + esc(q.capacity) + " · " + esc(q.color) + (q.band ? " · " + esc(q.band) + (q.bandOption ? " " + esc(q.bandOption) : "") : "") + '<div class="small muted">' + esc(q.supplierName) + '</div></div><input class="i" type="number" min="1" max="500" value="' + q.qty + '" data-qq="' + i + '"><button class="x" data-qx="' + i + '" title="ลบ">×</button></div>';
       }).join("") + "</div>" : '<p class="muted small">ยังไม่มีรายการ — เลือกสินค้าแล้วกด "เพิ่มลงแผ่น"</p>') +
       '<div class="row" style="margin-top:8px"><label class="small">เริ่มพิมพ์ที่ช่อง</label><input class="i" type="number" min="1" max="' + per + '" id="start" value="' + ui.start + '" style="width:76px"><span class="small muted">กดช่องในตัวอย่างได้ (กระดาษที่ใช้ไปแล้วบางส่วน)</span></div>' +
       sheets.map(function (h, i) { return '<div class="sheetwrap">' + h + '</div><div class="sheetlabel">แผ่นที่ ' + (i + 1) + " / " + sheets.length + "</div>"; }).join("") +
@@ -226,8 +249,9 @@
       '<p class="small muted">ความจุและสีของแต่ละรุ่น เพิ่มเองได้ที่ปุ่ม "แก้ไข" — หน้าสาขาจะแสดงเฉพาะที่กำหนดไว้</p><div class="list">' +
       (ms.length ? ms.map(function (m, i) {
         return '<div class="it' + (m.active ? "" : " off") + '"><div class="main"><b>' + esc(m.name) + "</b>" + (m.active ? "" : ' <span class="small muted">(ซ่อน)</span>') +
-          '<div class="small">' + (m.capacities.length ? m.capacities.map(esc).join(" · ") : '<span class="warn">ยังไม่มีความจุ</span>') + " &nbsp;|&nbsp; " +
-          (m.colors.length ? m.colors.map(function (c) { return '<span class="sw" style="background:' + esc(c.hex) + '"></span>' + esc(c.name); }).join(" ") : '<span class="warn">ยังไม่มีสี</span>') + "</div></div>" +
+          '<div class="small">' + (m.capacities.length ? m.capacities.map(esc).join(" · ") : '<span class="warn">ยังไม่มี' + (m.category === "Watch" ? "ขนาดตัวเรือน" : "ความจุ") + "</span>") + " &nbsp;|&nbsp; " +
+          (m.colors.length ? m.colors.map(function (c) { return '<span class="sw" style="background:' + esc(c.hex) + '"></span>' + esc(c.name); }).join(" ") : '<span class="warn">ยังไม่มีสี</span>') +
+          (m.category === "Watch" ? " &nbsp;|&nbsp; " + ((m.bands || []).length ? m.bands.map(function (b) { return esc(b.name) + (b.options.length ? " (" + b.options.map(esc).join("/") + ")" : ""); }).join(" · ") : '<span class="warn">ยังไม่มีประเภทสาย</span>') : "") + "</div></div>" +
           '<button class="btn sm ghost" data-mu="' + m.id + '"' + (i ? "" : " disabled") + '>▲</button><button class="btn sm ghost" data-md="' + m.id + '"' + (i < ms.length - 1 ? "" : " disabled") + '>▼</button><button class="btn sm" data-me="' + m.id + '">แก้ไข</button></div>';
       }).join("") : '<div class="muted small">ยังไม่มีรุ่นในหมวดนี้</div>') + "</div></div>";
     $$("[data-ac]").forEach(function (b) { b.onclick = function () { ui.adminCat = b.dataset.ac; adminProducts(); }; });
@@ -235,43 +259,59 @@
     $$("[data-mu],[data-md]").forEach(function (b) { b.onclick = act(async function () { await api("/api/admin/models/" + (b.dataset.mu || b.dataset.md) + "/move", { method: "POST", body: { dir: b.dataset.mu ? "up" : "down" } }); await refresh(); await viewAdmin(); }); });
     $$("[data-me]").forEach(function (b) { b.onclick = function () { modelEditor(A.models.find(function (m) { return m.id === Number(b.dataset.me); })); }; });
   }
-  var CAP_SUGGEST = ["64GB", "128GB", "256GB", "512GB", "1TB", "2TB"];
+  var CAP_SUGGEST = { iPhone: ["64GB", "128GB", "256GB", "512GB", "1TB", "2TB"], iPad: ["64GB", "128GB", "256GB", "512GB", "1TB", "2TB"], Watch: ["40mm", "41mm", "42mm", "44mm", "46mm", "49mm"] };
+  var BAND_SUGGEST = ["Milanese Loop", "Trail Loop", "Alpine Loop", "Ocean Band"];   // examples from Smile's spec — quick-add only
   function modelEditor(m) {
-    var e = JSON.parse(JSON.stringify(m));
+    var e = JSON.parse(JSON.stringify(m)), watch = e.category === "Watch";
+    e.bands = e.bands || [];
+    var capL = watch ? "ขนาดตัวเรือน (Case Size)" : "ความจุ";
     var b = modal("<h2>แก้ไขรุ่น</h2>" + '<div class="grid2">' + field("ชื่อรุ่น", '<input class="i" id="mn" value="' + esc(e.name) + '">') +
-      field("คัดลอกความจุ/สีจากรุ่นอื่น", '<select class="i" id="mcopy"><option value="">— เลือกรุ่น —</option>' + A.models.filter(function (x) { return x.id !== e.id && x.category === e.category && (x.capacities.length || x.colors.length); }).map(function (x) { return '<option value="' + x.id + '">' + esc(x.name) + "</option>"; }).join("") + "</select>") + "</div>" +
-      '<label class="f">ความจุ (ตัวเลือกขั้นที่ 2)</label><div class="chips" id="mcaps"></div><div class="row" style="margin:6px 0 12px"><input class="i" id="mcap" placeholder="เช่น 256GB" style="width:150px"><button class="btn sm" id="mcapadd">เพิ่ม</button><span class="small muted">หรือกด:</span>' + CAP_SUGGEST.map(function (c) { return '<button class="btn sm ghost" data-cs="' + c + '">' + c + "</button>"; }).join("") + "</div>" +
-      '<label class="f">สีเครื่อง (ตัวเลือกขั้นที่ 3 · ใช้เป็นสีตัวอักษรบนสติ๊กเกอร์ได้)</label><div id="mcols"></div><button class="btn sm ghost" id="mcoladd">+ เพิ่มสี</button>' +
+      field("คัดลอกข้อมูลจากรุ่นอื่น", '<select class="i" id="mcopy"><option value="">— เลือกรุ่น —</option>' + A.models.filter(function (x) { return x.id !== e.id && x.category === e.category && (x.capacities.length || x.colors.length || (x.bands || []).length); }).map(function (x) { return '<option value="' + x.id + '">' + esc(x.name) + "</option>"; }).join("") + "</select>") + "</div>" +
+      '<label class="f">' + capL + ' (ขั้นที่ 2)</label><div class="chips" id="mcaps"></div><div class="row" style="margin:6px 0 12px"><input class="i" id="mcap" placeholder="เช่น ' + CAP_SUGGEST[e.category][2] + '" style="width:150px"><button class="btn sm" id="mcapadd">เพิ่ม</button><span class="small muted">หรือกด:</span>' + CAP_SUGGEST[e.category].map(function (c) { return '<button class="btn sm ghost" data-cs="' + c + '">' + c + "</button>"; }).join("") + "</div>" +
+      '<label class="f">' + (watch ? "สีตัวเรือน (Case Color) — ติ๊กขนาดที่มีสีนี้ (ไม่ติ๊ก = ทุกขนาด)" : "สีเครื่อง (ขั้นที่ 3 · ใช้เป็นสีตัวอักษรบนสติ๊กเกอร์ได้)") + '</label><div id="mcols"></div><button class="btn sm ghost" id="mcoladd">+ เพิ่มสี</button>' +
+      (watch ? '<label class="f" style="margin-top:12px">ประเภทสาย (Band Type) — ติ๊กขนาดที่ใช้ได้ (ไม่ติ๊ก = ทุกขนาด) · ตัวเลือกย่อยคั่นด้วย , เช่น S/M, M/L</label><div id="mbands"></div><div class="row"><button class="btn sm ghost" id="mbandadd">+ เพิ่มประเภทสาย</button><span class="small muted">หรือกด:</span>' + BAND_SUGGEST.map(function (x) { return '<button class="btn sm ghost" data-bs="' + x + '">' + x + "</button>"; }).join("") + "</div>" : "") +
       '<div class="row" style="margin-top:12px"><label><input type="checkbox" id="mact"' + (e.active ? " checked" : "") + "> แสดงที่หน้าสาขา</label></div>" +
       '<div class="err" id="merr"></div><div class="acts"><button class="btn danger" id="mdel">ลบรุ่น</button><span class="spacer"></span><button class="btn ghost" id="mx">ยกเลิก</button><button class="btn" id="ms">บันทึก</button></div>');
-    function readCols() { e.colors = $$(".crow", b).map(function (r) { return { name: $(".cn", r).value, hex: $(".cc", r).value }; }); }
+    var sizeBoxes = function (cls, sel) { return watch && e.capacities.length ? '<div class="sizes">' + e.capacities.map(function (c) { return '<label class="small"><input type="checkbox" class="' + cls + '" value="' + esc(c) + '"' + ((sel || []).indexOf(c) > -1 ? " checked" : "") + "> " + esc(c) + "</label>"; }).join("") + "</div>" : ""; };
+    function readAll() {
+      e.colors = $$(".crow", b).map(function (r) { return { name: $(".cn", r).value, hex: $(".cc", r).value, sizes: $$(".csz:checked", r).map(function (x) { return x.value; }) }; });
+      if (watch) e.bands = $$(".brow", b).map(function (r) { return { name: $(".bn", r).value, options: $(".bopt", r).value.split(",").map(function (o) { return o.trim(); }).filter(Boolean), sizes: $$(".bsz:checked", r).map(function (x) { return x.value; }) }; });
+    }
     function draw() {
       $("#mcaps", b).innerHTML = e.capacities.length ? e.capacities.map(function (c, i) { return '<span class="chip">' + esc(c) + ' <button class="x" data-cx="' + i + '">×</button></span>'; }).join("") : '<span class="muted small">ยังไม่มี</span>';
-      $("#mcols", b).innerHTML = e.colors.map(function (c, i) { return '<div class="crow"><input class="i cn" value="' + esc(c.name) + '" placeholder="ชื่อสี เช่น Natural Titanium"><input type="color" class="cc" value="' + esc(c.hex) + '"><button class="x" data-kx="' + i + '">×</button></div>'; }).join("");
-      $$("[data-cx]", b).forEach(function (x) { x.onclick = function () { e.capacities.splice(Number(x.dataset.cx), 1); draw(); }; });
-      $$("[data-kx]", b).forEach(function (x) { x.onclick = function () { readCols(); e.colors.splice(Number(x.dataset.kx), 1); draw(); }; });
+      $("#mcols", b).innerHTML = e.colors.map(function (c, i) { return '<div class="crow"><div class="crowin"><input class="i cn" value="' + esc(c.name) + '" placeholder="ชื่อสี เช่น Midnight"><input type="color" class="cc" value="' + esc(c.hex) + '"><button class="x" data-kx="' + i + '">×</button></div>' + sizeBoxes("csz", c.sizes) + "</div>"; }).join("");
+      if (watch) $("#mbands", b).innerHTML = e.bands.map(function (x, i) { return '<div class="brow"><div class="crowin2"><input class="i bn" value="' + esc(x.name) + '" placeholder="ชื่อประเภทสาย"><input class="i bopt" value="' + esc((x.options || []).join(", ")) + '" placeholder="ตัวเลือกย่อย (ถ้ามี) เช่น S/M, M/L"><button class="x" data-bx="' + i + '">×</button></div>' + sizeBoxes("bsz", x.sizes) + "</div>"; }).join("") || '<span class="muted small">ยังไม่มี</span>';
+      $$("[data-cx]", b).forEach(function (x) { x.onclick = function () { readAll(); var rm = e.capacities.splice(Number(x.dataset.cx), 1)[0]; e.colors.forEach(function (c) { c.sizes = (c.sizes || []).filter(function (z) { return z !== rm; }); }); e.bands.forEach(function (c) { c.sizes = (c.sizes || []).filter(function (z) { return z !== rm; }); }); draw(); }; });
+      $$("[data-kx]", b).forEach(function (x) { x.onclick = function () { readAll(); e.colors.splice(Number(x.dataset.kx), 1); draw(); }; });
+      $$("[data-bx]", b).forEach(function (x) { x.onclick = function () { readAll(); e.bands.splice(Number(x.dataset.bx), 1); draw(); }; });
     }
     draw();
-    var addCap = function (v) { v = String(v || "").trim(); if (v && e.capacities.indexOf(v) === -1) e.capacities.push(v); draw(); };
+    var addCap = function (v) { readAll(); v = String(v || "").trim(); if (v && e.capacities.indexOf(v) === -1) e.capacities.push(v); draw(); };
     $("#mcapadd", b).onclick = function () { addCap($("#mcap", b).value); $("#mcap", b).value = ""; };
     $("#mcap", b).addEventListener("keydown", function (ev) { if (ev.key === "Enter") { addCap(this.value); this.value = ""; } });
     $$("[data-cs]", b).forEach(function (x) { x.onclick = function () { addCap(x.dataset.cs); }; });
-    $("#mcoladd", b).onclick = function () { readCols(); e.colors.push({ name: "", hex: "#000000" }); draw(); $$(".cn", b).slice(-1)[0].focus(); };
-    $("#mcopy", b).onchange = function () { var id = Number(this.value), src = A.models.find(function (x) { return x.id === id; }); if (!src) return; e.capacities = src.capacities.slice(); e.colors = JSON.parse(JSON.stringify(src.colors)); draw(); };
+    $("#mcoladd", b).onclick = function () { readAll(); e.colors.push({ name: "", hex: "#000000", sizes: [] }); draw(); $$(".cn", b).slice(-1)[0].focus(); };
+    if (watch) {
+      $("#mbandadd", b).onclick = function () { readAll(); e.bands.push({ name: "", options: [], sizes: [] }); draw(); $$(".bn", b).slice(-1)[0].focus(); };
+      $$("[data-bs]", b).forEach(function (x) { x.onclick = function () { readAll(); if (!e.bands.some(function (y) { return y.name === x.dataset.bs; })) e.bands.push({ name: x.dataset.bs, options: [], sizes: [] }); draw(); }; });
+    }
+    $("#mcopy", b).onchange = function () { var id = Number(this.value), src = A.models.find(function (x) { return x.id === id; }); if (!src) return; e.capacities = src.capacities.slice(); e.colors = JSON.parse(JSON.stringify(src.colors)); e.bands = JSON.parse(JSON.stringify(src.bands || [])); draw(); };
     $("#mx", b).onclick = closeModal;
-    $("#ms", b).onclick = act(async function () { readCols(); await api("/api/admin/models/" + e.id, { method: "PUT", body: { name: $("#mn", b).value, active: $("#mact", b).checked, capacities: e.capacities, colors: e.colors } }); closeModal(); toast("บันทึกแล้ว"); await refresh(); viewAdmin(); });
-    $("#mdel", b).onclick = act(async function () { if (!confirm("ลบรุ่น " + e.name + " พร้อมความจุและสีทั้งหมด?")) return; await api("/api/admin/models/" + e.id, { method: "DELETE" }); closeModal(); await refresh(); viewAdmin(); });
+    $("#ms", b).onclick = act(async function () { readAll(); await api("/api/admin/models/" + e.id, { method: "PUT", body: { name: $("#mn", b).value, active: $("#mact", b).checked, capacities: e.capacities, colors: e.colors, bands: e.bands } }); closeModal(); toast("บันทึกแล้ว"); await refresh(); viewAdmin(); });
+    $("#mdel", b).onclick = act(async function () { if (!confirm("ลบรุ่น " + e.name + " พร้อมข้อมูลทั้งหมด?")) return; await api("/api/admin/models/" + e.id, { method: "DELETE" }); closeModal(); await refresh(); viewAdmin(); });
   }
 
   // --- suppliers
   function adminSuppliers() {
     $("#atab").innerHTML = '<div class="card"><div class="row"><b>ซัพพลายเออร์ (ขั้นที่ 4)</b><span class="spacer"></span><input class="i" id="news" placeholder="ชื่อซัพพลายเออร์" style="width:200px"><button class="btn" id="adds">+ เพิ่ม</button></div>' +
       '<p class="small muted">มีโลโก้ → แสดงโลโก้บนสติ๊กเกอร์ · ไม่มีโลโก้ → แสดงชื่อเป็นตัวอักษร</p><div class="list">' + A.suppliers.map(function (s, i) {
-        return '<div class="it' + (s.active ? "" : " off") + '"><div class="slogo">' + (s.logo ? '<img src="' + esc(s.logo) + "?t=" + Date.now() + '" alt="">' : '<span class="muted small">ไม่มีโลโก้</span>') + '</div><div class="main"><input class="i" value="' + esc(s.name) + '" data-sn="' + s.id + '" style="max-width:220px"> <label class="small"><input type="checkbox" data-sa="' + s.id + '"' + (s.active ? " checked" : "") + '> แสดงที่หน้าสาขา</label></div>' +
+        return '<div class="it' + (s.active ? "" : " off") + '"><div class="slogo">' + (s.logo ? '<img src="' + esc(s.logo) + "?t=" + Date.now() + '" alt="">' : '<span class="muted small">ไม่มีโลโก้</span>') + '</div><div class="main"><input class="i" value="' + esc(s.name) + '" data-sn="' + s.id + '" style="max-width:220px"> <label class="small"><input type="checkbox" data-sa="' + s.id + '"' + (s.active ? " checked" : "") + '> แสดงที่หน้าสาขา</label>' +
+          '<div class="small">ใช้กับหมวด: ' + A.categories.map(function (c) { return '<label><input type="checkbox" data-scat="' + s.id + '" value="' + c + '"' + (!s.categories || s.categories.indexOf(c) > -1 ? " checked" : "") + "> " + c + "</label>"; }).join(" ") + "</div></div>" +
           '<label class="btn sm ghost">อัปโหลดโลโก้<input type="file" accept="image/png,image/jpeg,image/webp" data-sl="' + s.id + '" hidden></label>' + (s.logo ? '<button class="btn sm ghost" data-slx="' + s.id + '">ลบโลโก้</button>' : "") +
           '<button class="btn sm ghost" data-su="' + s.id + '"' + (i ? "" : " disabled") + '>▲</button><button class="btn sm ghost" data-sd="' + s.id + '"' + (i < A.suppliers.length - 1 ? "" : " disabled") + '>▼</button><button class="btn sm danger" data-sx="' + s.id + '">ลบ</button></div>';
       }).join("") + "</div></div>";
-    var save = act(async function (id) { await api("/api/admin/suppliers/" + id, { method: "PUT", body: { name: $('[data-sn="' + id + '"]').value, active: $('[data-sa="' + id + '"]').checked } }); toast("บันทึกแล้ว"); await refresh(); });
+    var save = act(async function (id) { await api("/api/admin/suppliers/" + id, { method: "PUT", body: { name: $('[data-sn="' + id + '"]').value, active: $('[data-sa="' + id + '"]').checked, categories: $$('[data-scat="' + id + '"]:checked').map(function (x) { return x.value; }) } }); toast("บันทึกแล้ว"); await refresh(); A = await api("/api/admin/catalog"); });
+    $$("[data-scat]").forEach(function (i) { i.onchange = function () { save(i.dataset.scat); }; });
     $$("[data-sn]").forEach(function (i) { i.onchange = function () { save(i.dataset.sn); }; });
     $$("[data-sa]").forEach(function (i) { i.onchange = function () { save(i.dataset.sa); }; });
     $("#adds").onclick = act(async function () { var n = $("#news").value.trim(); if (!n) return; await api("/api/admin/suppliers", { method: "POST", body: { name: n } }); await refresh(); viewAdmin(); });
@@ -282,7 +322,7 @@
   }
 
   // --- template designer
-  var EL_LABEL = { model: "รุ่น", capacity: "ความจุ", color: "สีเครื่อง", supplier: "ซัพพลายเออร์", text: "ข้อความคงที่" };
+  var EL_LABEL = { model: "รุ่น", capacity: "ความจุ / ขนาดตัวเรือน", color: "สีเครื่อง / สีตัวเรือน", band: "ประเภทสาย (Watch)", bandOption: "ตัวเลือกสาย (Watch)", supplier: "ซัพพลายเออร์", text: "ข้อความคงที่" };
   function adminTemplate() {
     var t = JSON.parse(JSON.stringify(A.templates[ui.tplCat]));
     var sm = A.models.filter(function (m) { return m.category === ui.tplCat; });
@@ -302,7 +342,9 @@
       var mid = Number($("#smod") ? $("#smod").value : 0), sid = Number($("#ssup") ? $("#ssup").value : 0);
       var m = A.models.find(function (x) { return x.id === mid; }) || { name: "ชื่อรุ่น", capacities: [], colors: [] };
       var s = A.suppliers.find(function (x) { return x.id === sid; }) || { name: "Supplier" };
-      return { model: m.name, capacity: m.capacities[0] || "256GB", color: m.colors[0] || { name: "สีตัวอย่าง", hex: "#3d4466" }, supplier: { name: s.name, logo: s.logo } };
+      var bd = (m.bands || [])[0];
+      return { model: m.name, capacity: m.capacities[0] || (ui.tplCat === "Watch" ? "44mm" : "256GB"), color: m.colors[0] || { name: "สีตัวอย่าง", hex: "#3d4466" },
+        band: bd ? bd.name : (ui.tplCat === "Watch" ? "Sport Band" : ""), bandOption: bd ? (bd.options[0] || "") : (ui.tplCat === "Watch" ? "M/L" : ""), supplier: { name: s.name, logo: s.logo } };
     }
     function drawEls() {
       $("#tels").innerHTML = t.elements.map(function (e, i) {

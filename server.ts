@@ -22,14 +22,18 @@ const IPHONE_MODELS = ["iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 1
 // iPad models confirmed by Smile (19 Oct 2026, htask-1792372800760). Capacities / colours: entered later by Smile.
 const IPAD_MODELS = ["iPad (A16)", "iPad mini (A17 Pro)", "iPad Air 11-inch (M2)", "iPad Air 13-inch (M2)", "iPad Air 11-inch (M3)", "iPad Air 13-inch (M3)",
   "iPad Air 11-inch (M4)", "iPad Air 13-inch (M4)", "iPad Pro 11-inch (M4)", "iPad Pro 13-inch (M4)", "iPad Pro 11-inch (M5)", "iPad Pro 13-inch (M5)"]
-const SEED_MODELS: Record<string, string[]> = { iPhone: IPHONE_MODELS, iPad: IPAD_MODELS }
-const SUPPLIERS = ["Synnex", "VST", "AIS"]
+// Apple Watch models confirmed by Smile (19 Oct 2026, htask-1792373573801). Sizes / colours / bands: entered later by Smile.
+const WATCH_MODELS = ["Apple Watch SE", "Apple Watch Series 6", "Apple Watch SE (2nd generation)", "Apple Watch Series 7", "Apple Watch Series 8", "Apple Watch Ultra",
+  "Apple Watch Series 9", "Apple Watch Ultra 2", "Apple Watch Series 10", "Apple Watch SE 3", "Apple Watch Series 11", "Apple Watch Ultra 3", "Apple Watch Series 12", "Apple Watch Ultra 4"]
+const SEED_MODELS: Record<string, string[]> = { iPhone: IPHONE_MODELS, iPad: IPAD_MODELS, Watch: WATCH_MODELS }
+// Supplier → categories it applies to (null = all). Watch: Synnex / VST only.
+const SUPPLIERS: [string, string[] | null][] = [["Synnex", null], ["VST", null], ["AIS", ["iPhone", "iPad"]]]
 
 // Sheet: A4 portrait, 5 × 10 = 50 labels of 42 × 27.9 mm, centred vertically.
 const DEFAULT_LAYOUT = { pageW: 210, pageH: 297, cols: 5, rows: 10, cellW: 42, cellH: 27.9, marginTop: 9, marginLeft: 0, gapX: 0, gapY: 0, offsetX: 0, offsetY: 0, showBorders: false }
 type Layout = typeof DEFAULT_LAYOUT
 const FONTS = ["Helvetica", "Noto Sans Thai", "Sarabun", "Prompt", "Kanit"]
-const EL_TYPES = ["model", "capacity", "color", "supplier", "text"]
+const EL_TYPES = ["model", "capacity", "color", "band", "bandOption", "supplier", "text"]
 // Default template = the look of Smile's sample (model / capacity / colour / logo, centred, 9 pt).
 const DEFAULT_TEMPLATE = {
   padding: 1.2, valign: "center", lineHeight: 1.15,
@@ -47,6 +51,12 @@ async function initDB() {
   await sql`CREATE TABLE IF NOT EXISTS sticker_capacities (id SERIAL PRIMARY KEY, model_id INT NOT NULL REFERENCES sticker_models(id) ON DELETE CASCADE, value TEXT NOT NULL, sort INT NOT NULL DEFAULT 0)`
   await sql`CREATE TABLE IF NOT EXISTS sticker_colors (id SERIAL PRIMARY KEY, model_id INT NOT NULL REFERENCES sticker_models(id) ON DELETE CASCADE, name TEXT NOT NULL, hex TEXT NOT NULL DEFAULT '#000000', sort INT NOT NULL DEFAULT 0)`
   await sql`CREATE TABLE IF NOT EXISTS sticker_suppliers (id SERIAL PRIMARY KEY, name TEXT NOT NULL, logo BYTEA, logo_mime TEXT, sort INT NOT NULL DEFAULT 0, active BOOLEAN NOT NULL DEFAULT true)`
+  // Watch (Oct 2026): colours / bands can be limited to some case sizes ([] = all sizes); bands may have
+  // sub-options (e.g. S/M, M/L); suppliers can be limited to some categories (NULL = all).
+  await sql`ALTER TABLE sticker_colors ADD COLUMN IF NOT EXISTS sizes JSONB NOT NULL DEFAULT '[]'::jsonb`
+  await sql`CREATE TABLE IF NOT EXISTS sticker_bands (id SERIAL PRIMARY KEY, model_id INT NOT NULL REFERENCES sticker_models(id) ON DELETE CASCADE, name TEXT NOT NULL,
+    sizes JSONB NOT NULL DEFAULT '[]'::jsonb, options JSONB NOT NULL DEFAULT '[]'::jsonb, sort INT NOT NULL DEFAULT 0)`
+  await sql`ALTER TABLE sticker_suppliers ADD COLUMN IF NOT EXISTS categories JSONB`
   // Each category's confirmed model list is inserted once (a flag keeps deleted models from coming back).
   for (const [cat, list] of Object.entries(SEED_MODELS)) {
     if (await getSetting("seeded:" + cat)) continue
@@ -57,11 +67,19 @@ async function initDB() {
   const [{ s }] = await sql`SELECT count(*)::int AS s FROM sticker_suppliers`
   if (s === 0) {
     const synnexLogo = new Uint8Array(await Bun.file(resolve(PUBLIC, "logo-synnex.png")).arrayBuffer())
-    for (const [i, name] of SUPPLIERS.entries()) {
-      if (name === "Synnex") await sql`INSERT INTO sticker_suppliers (name, logo, logo_mime, sort) VALUES (${name}, ${synnexLogo}, 'image/png', ${i})`
-      else await sql`INSERT INTO sticker_suppliers (name, sort) VALUES (${name}, ${i})`
+    for (const [i, [name, cats]] of SUPPLIERS.entries()) {
+      const c = cats ? JSON.stringify(cats) : null
+      if (name === "Synnex") await sql`INSERT INTO sticker_suppliers (name, logo, logo_mime, sort, categories) VALUES (${name}, ${synnexLogo}, 'image/png', ${i}, ${c}::jsonb)`
+      else await sql`INSERT INTO sticker_suppliers (name, sort, categories) VALUES (${name}, ${i}, ${c}::jsonb)`
     }
-    console.log("[db] seeded suppliers", SUPPLIERS.join(", "))
+    console.log("[db] seeded suppliers", SUPPLIERS.map((x) => x[0]).join(", "))
+    await setSetting("migrated:supplier-categories", true)
+  }
+  // Existing installs: AIS is not a Watch supplier (Smile's Watch spec lists Synnex / VST) — once.
+  if (!(await getSetting("migrated:supplier-categories"))) {
+    await sql`UPDATE sticker_suppliers SET categories = '["iPhone","iPad"]'::jsonb WHERE lower(name) = 'ais' AND categories IS NULL`
+    await setSetting("migrated:supplier-categories", true)
+    console.log("[db] AIS limited to iPhone / iPad")
   }
   // Admin account: created from ADMIN_PASSWORD once, must be changed at first login.
   if (!(await getSetting("admin")) && process.env.ADMIN_PASSWORD) {
@@ -73,7 +91,12 @@ const parse = (v: any) => { let x = v; while (typeof x === "string") x = JSON.pa
 async function getSetting(key: string): Promise<any> { const [r] = await sql`SELECT value::text AS v FROM sticker_settings WHERE key = ${key}`; return r ? parse(r.v) : null }
 async function setSetting(key: string, value: any) { await sql`INSERT INTO sticker_settings (key, value) VALUES (${key}, ${JSON.stringify(value)}::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value` }
 async function getLayout(): Promise<Layout> { return { ...DEFAULT_LAYOUT, ...((await getSetting("layout")) ?? {}) } }
-async function getTemplate(cat: string) { return (await getSetting("template:" + cat)) ?? DEFAULT_TEMPLATE }
+// Watch default: model / case size / case colour / band (+ option) / supplier.
+const el = (type: string, x: any = {}) => ({ type, font: "Helvetica", size: 8.5, bold: false, italic: false, color: "#000000", align: "center", mt: 0.25, prefix: "", suffix: "", ...x })
+const DEFAULT_TEMPLATES: Record<string, any> = {
+  Watch: { padding: 1.2, valign: "center", lineHeight: 1.12, elements: [el("model", { bold: true, mt: 0 }), el("capacity"), el("color", { useItemColor: true }), el("band"), el("bandOption"), el("supplier", { size: 8, bold: true, mt: 0.6, logoH: 2.4 })] },
+}
+async function getTemplate(cat: string) { return (await getSetting("template:" + cat)) ?? DEFAULT_TEMPLATES[cat] ?? DEFAULT_TEMPLATE }
 
 /* ---------- admin session: signed cookie, invalidated when the password changes ---------- */
 async function adminState(): Promise<any> { return await getSetting("admin") }
@@ -110,17 +133,19 @@ function cleanTemplate(b: any) {
 async function catalog(includeInactive: boolean) {
   const models = includeInactive ? await sql`SELECT * FROM sticker_models ORDER BY category, sort, id` : await sql`SELECT * FROM sticker_models WHERE active ORDER BY category, sort, id`
   const caps = await sql`SELECT model_id, value FROM sticker_capacities ORDER BY sort, id`
-  const cols = await sql`SELECT model_id, name, hex FROM sticker_colors ORDER BY sort, id`
-  const sups = includeInactive ? await sql`SELECT id, name, active, logo IS NOT NULL AS has_logo FROM sticker_suppliers ORDER BY sort, id`
-    : await sql`SELECT id, name, active, logo IS NOT NULL AS has_logo FROM sticker_suppliers WHERE active ORDER BY sort, id`
+  const cols = await sql`SELECT model_id, name, hex, sizes::text AS sizes FROM sticker_colors ORDER BY sort, id`
+  const bands = await sql`SELECT model_id, name, sizes::text AS sizes, options::text AS options FROM sticker_bands ORDER BY sort, id`
+  const sups = includeInactive ? await sql`SELECT id, name, active, logo IS NOT NULL AS has_logo, categories::text AS categories FROM sticker_suppliers ORDER BY sort, id`
+    : await sql`SELECT id, name, active, logo IS NOT NULL AS has_logo, categories::text AS categories FROM sticker_suppliers WHERE active ORDER BY sort, id`
   const templates: Record<string, any> = {}
   for (const c of CATEGORIES) templates[c] = await getTemplate(c)
   return {
     categories: CATEGORIES,
     models: models.map((m: any) => ({ id: m.id, category: m.category, name: m.name, active: m.active,
       capacities: caps.filter((c: any) => c.model_id === m.id).map((c: any) => c.value),
-      colors: cols.filter((c: any) => c.model_id === m.id).map((c: any) => ({ name: c.name, hex: c.hex })) })),
-    suppliers: sups.map((s: any) => ({ id: s.id, name: s.name, active: s.active, logo: s.has_logo ? `/api/suppliers/${s.id}/logo` : null })),
+      colors: cols.filter((c: any) => c.model_id === m.id).map((c: any) => ({ name: c.name, hex: c.hex, sizes: parse(c.sizes) ?? [] })),
+      bands: bands.filter((b: any) => b.model_id === m.id).map((b: any) => ({ name: b.name, sizes: parse(b.sizes) ?? [], options: parse(b.options) ?? [] })) })),
+    suppliers: sups.map((s: any) => ({ id: s.id, name: s.name, active: s.active, logo: s.has_logo ? `/api/suppliers/${s.id}/logo` : null, categories: s.categories ? parse(s.categories) : null })),
     templates, layout: await getLayout(), fonts: FONTS,
   }
 }
@@ -202,14 +227,20 @@ async function api(req: Request, url: URL, ip: string): Promise<Response> {
     const id = Number(mm[1]), b: any = await req.json().catch(() => ({}))
     const name = str(b.name, 60); if (!name) return json({ error: "กรุณาใส่ชื่อรุ่น" }, 400)
     const caps = [...new Set((Array.isArray(b.capacities) ? b.capacities : []).map((v: any) => str(v, 20)).filter(Boolean))].slice(0, 12) as string[]
-    const cols = (Array.isArray(b.colors) ? b.colors : []).slice(0, 16).map((c: any) => ({ name: str(c?.name, 40), hex: HEX.test(c?.hex) ? c.hex : "#000000" })).filter((c: any) => c.name)
+    // sizes on a colour / band must be among this model's sizes ([] = all sizes)
+    const onlySizes = (v: any) => [...new Set((Array.isArray(v) ? v : []).map((x: any) => str(x, 20)).filter((x: string) => caps.includes(x)))]
+    const cols = (Array.isArray(b.colors) ? b.colors : []).slice(0, 24).map((c: any) => ({ name: str(c?.name, 40), hex: HEX.test(c?.hex) ? c.hex : "#000000", sizes: onlySizes(c?.sizes) })).filter((c: any) => c.name)
+    const bnds = (Array.isArray(b.bands) ? b.bands : []).slice(0, 30).map((x: any) => ({ name: str(x?.name, 40), sizes: onlySizes(x?.sizes),
+      options: [...new Set((Array.isArray(x?.options) ? x.options : String(x?.options ?? "").split(",")).map((o: any) => str(o, 30)).filter(Boolean))].slice(0, 12) })).filter((x: any) => x.name)
     await sql.begin(async (tx) => {
       const [r] = await tx`UPDATE sticker_models SET name = ${name}, active = ${b.active !== false} WHERE id = ${id} RETURNING id`
       if (!r) throw new Error("ไม่พบรุ่นนี้")
       await tx`DELETE FROM sticker_capacities WHERE model_id = ${id}`
       for (const [i, v] of caps.entries()) await tx`INSERT INTO sticker_capacities (model_id, value, sort) VALUES (${id}, ${v}, ${i})`
       await tx`DELETE FROM sticker_colors WHERE model_id = ${id}`
-      for (const [i, c] of cols.entries()) await tx`INSERT INTO sticker_colors (model_id, name, hex, sort) VALUES (${id}, ${c.name}, ${c.hex}, ${i})`
+      for (const [i, c] of cols.entries()) await tx`INSERT INTO sticker_colors (model_id, name, hex, sizes, sort) VALUES (${id}, ${c.name}, ${c.hex}, ${JSON.stringify(c.sizes)}::jsonb, ${i})`
+      await tx`DELETE FROM sticker_bands WHERE model_id = ${id}`
+      for (const [i, x] of bnds.entries()) await tx`INSERT INTO sticker_bands (model_id, name, sizes, options, sort) VALUES (${id}, ${x.name}, ${JSON.stringify(x.sizes)}::jsonb, ${JSON.stringify(x.options)}::jsonb, ${i})`
     })
     return json({ ok: true })
   }
@@ -227,7 +258,10 @@ async function api(req: Request, url: URL, ip: string): Promise<Response> {
   if (sm && !sm[2] && m === "PUT") {
     const b: any = await req.json().catch(() => ({})); const name = str(b.name, 40)
     if (!name) return json({ error: "กรุณาใส่ชื่อซัพพลายเออร์" }, 400)
-    await sql`UPDATE sticker_suppliers SET name = ${name}, active = ${b.active !== false} WHERE id = ${Number(sm[1])}`
+    const cats = Array.isArray(b.categories) ? CATEGORIES.filter((c) => b.categories.includes(c)) : null
+    if (cats && !cats.length) return json({ error: "เลือกอย่างน้อย 1 หมวด" }, 400)
+    const catJson = cats && cats.length < CATEGORIES.length ? JSON.stringify(cats) : null   // all categories = NULL
+    await sql`UPDATE sticker_suppliers SET name = ${name}, active = ${b.active !== false}, categories = ${catJson}::jsonb WHERE id = ${Number(sm[1])}`
     return json({ ok: true })
   }
   if (sm && !sm[2] && m === "DELETE") { await sql`DELETE FROM sticker_suppliers WHERE id = ${Number(sm[1])}`; return json({ ok: true }) }
