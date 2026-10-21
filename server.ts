@@ -37,7 +37,9 @@ const logoFile = async (f: string) => new Uint8Array(await Bun.file(resolve(PUBL
 const DEFAULT_LAYOUT = { pageW: 210, pageH: 297, cols: 5, rows: 10, cellW: 38, cellH: 27, marginTop: 9.45, marginLeft: 2, gapX: 4, gapY: 0.9, offsetX: 0, offsetY: 0, showBorders: false }
 type Layout = typeof DEFAULT_LAYOUT
 const FONTS = ["Helvetica", "Noto Sans Thai", "Sarabun", "Prompt", "Kanit"]
-const EL_TYPES = ["model", "capacity", "color", "band", "bandOption", "supplier", "text"]
+const EL_TYPES = ["model", "capacity", "color", "band", "bandOption", "supplier", "received", "text"]
+// Last line of every label: the date the branch received the goods (entered on the branch page) — Smile, htask-1792569623133.
+const RECEIVED_EL = { type: "received", font: "Helvetica", size: 7, bold: false, italic: false, color: "#000000", align: "center", mt: 0.5, prefix: "รับสินค้า ", suffix: "" }
 // Default template = the look of Smile's sample (model / capacity / colour / logo, centred, 9 pt).
 // Logos fit a box (logoW × logoH mm, aspect kept) = the template's sizes: Synnex 21.3 × 3.0, VST ECS 19.05 × 6.35.
 const DEFAULT_TEMPLATE = {
@@ -47,6 +49,7 @@ const DEFAULT_TEMPLATE = {
     { type: "capacity", font: "Helvetica", size: 9, bold: false, italic: false, color: "#000000", align: "center", mt: 0.3, prefix: "", suffix: "" },
     { type: "color", font: "Helvetica", size: 9, bold: false, italic: false, color: "#000000", useItemColor: true, align: "center", mt: 0.3, prefix: "", suffix: "" },
     { type: "supplier", font: "Helvetica", size: 8, bold: true, italic: false, color: "#000000", align: "center", mt: 0.8, prefix: "", suffix: "", logoW: 21.3, logoH: 6.35 },
+    RECEIVED_EL,
   ],
 }
 
@@ -162,6 +165,16 @@ async function initDB() {
       console.log("[db] removed Watch models:", r.map((x: any) => x.name).join(", ") || "(none)")
     } else console.log("[db] Watch cleanup skipped — kept models not all found:", found.map((x: any) => x.name).join(", "))
   }
+  // Saved templates get the received-date line at the end, once (templates still on the defaults pick it up from the code).
+  if (!(await getSetting("migrated:received-line"))) {
+    for (const cat of Object.keys(SEED_MODELS)) {
+      const t = await getSetting("template:" + cat); if (!t?.elements || t.elements.some((e: any) => e.type === "received")) continue
+      // Watch (6 lines + logo) needs the room: slightly tighter line spacing if still on the old default, smaller date line.
+      if (cat === "Watch") { if (t.lineHeight === 1.12) t.lineHeight = 1.05; t.elements.push({ ...RECEIVED_EL, size: 6.5, mt: 0.3 }) } else t.elements.push({ ...RECEIVED_EL })
+      await setSetting("template:" + cat, t); console.log("[db] received-date line added to template", cat)
+    }
+    await setSetting("migrated:received-line", true)
+  }
   // Admin account: created from ADMIN_PASSWORD once, must be changed at first login.
   if (!(await getSetting("admin")) && process.env.ADMIN_PASSWORD) {
     await setSetting("admin", { hash: await Bun.password.hash(process.env.ADMIN_PASSWORD), mustChange: true, secret: randomBytes(32).toString("base64url"), ver: 1 })
@@ -175,7 +188,7 @@ async function getLayout(): Promise<Layout> { return { ...DEFAULT_LAYOUT, ...((a
 // Watch default: model / case size / case colour / band (+ option) / supplier.
 const el = (type: string, x: any = {}) => ({ type, font: "Helvetica", size: 8.5, bold: false, italic: false, color: "#000000", align: "center", mt: 0.25, prefix: "", suffix: "", ...x })
 const DEFAULT_TEMPLATES: Record<string, any> = {
-  Watch: { padding: 1.2, valign: "center", lineHeight: 1.12, elements: [el("model", { bold: true, mt: 0 }), el("capacity"), el("color", { useItemColor: true }), el("band"), el("bandOption"), el("supplier", { size: 8, bold: true, mt: 0.6, logoW: 21.3, logoH: 6.35 })] },
+  Watch: { padding: 1.2, valign: "center", lineHeight: 1.05, elements: [el("model", { bold: true, mt: 0 }), el("capacity"), el("color", { useItemColor: true }), el("band"), el("bandOption"), el("supplier", { size: 8, bold: true, mt: 0.6, logoW: 21.3, logoH: 6.35 }), { ...RECEIVED_EL, size: 6.5, mt: 0.3 }] },
 }
 async function getTemplate(cat: string) { return (await getSetting("template:" + cat)) ?? DEFAULT_TEMPLATES[cat] ?? DEFAULT_TEMPLATE }
 

@@ -7,7 +7,9 @@
   var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   var C = null;   // catalog from the server
-  var ui = { cat: "iPhone", sel: {}, qty: 1, queue: [], start: 1, adminTab: "products", adminCat: "iPhone", tplCat: "iPhone" };
+  function today() { var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
+  function fmtDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ""); return m ? m[3] + "/" + m[2] + "/" + m[1] : ""; }
+  var ui = { cat: "iPhone", sel: {}, qty: 1, received: today(), queue: [], start: 1, adminTab: "products", adminCat: "iPhone", tplCat: "iPhone" };
   try { var saved = JSON.parse(localStorage.getItem("sp2") || "{}"); ui.queue = saved.queue || []; ui.start = saved.start || 1; ui.cat = saved.cat || "iPhone"; } catch (e) {}
   function persist() { try { localStorage.setItem("sp2", JSON.stringify({ queue: ui.queue, start: ui.start, cat: ui.cat })); } catch (e) {} }
 
@@ -87,6 +89,7 @@
       else if (e.type === "text") text = e.text;
       else if (e.type === "band") text = v.band;
       else if (e.type === "bandOption") text = v.bandOption;
+      else if (e.type === "received") text = fmtDate(v.received);
       var style = "font-family:" + (FONT_CSS[e.font] || FONT_CSS.Helvetica) + ";font-size:" + e.size + "pt;font-weight:" + (e.bold ? 700 : 400) + ";font-style:" + (e.italic ? "italic" : "normal") +
         ";text-align:" + e.align + ";margin-top:" + e.mt + "mm;line-height:" + tpl.lineHeight + ";color:" + color;
       if (e.type === "supplier") {
@@ -108,7 +111,7 @@
   }
   function valsOf(item) {
     var sup = C.suppliers.find(function (s) { return s.id === item.supplierId; }) || { name: item.supplierName, logo: null };
-    return { model: item.model, capacity: item.capacity, color: { name: item.color, hex: item.hex }, band: item.band || "", bandOption: item.bandOption || "", supplier: { name: sup.name, logo: sup.logo } };
+    return { model: item.model, capacity: item.capacity, color: { name: item.color, hex: item.hex }, band: item.band || "", bandOption: item.bandOption || "", received: item.received || "", supplier: { name: sup.name, logo: sup.logo } };
   }
   function tplFor(cat) { return C.templates[cat]; }
 
@@ -208,21 +211,24 @@
     var s = ui.sel, m = C.models.find(function (x) { return x.id === s.modelId; }), sup = suppliersFor(ui.cat).find(function (x) { return x.id === s.supplierId; });
     if (!m || s.capacity == null || s.color == null || !sup) return null;
     if (ui.cat === "Watch") { var b = (m.bands || []).find(function (x) { return x.name === s.band; }); if (!b || (b.options.length && b.options.indexOf(s.bandOption) === -1)) return null; }
-    return { cat: ui.cat, model: m.name, capacity: s.capacity, color: s.color, hex: s.hex, band: s.band || "", bandOption: s.bandOption || "", supplierId: sup.id, supplierName: sup.name };
+    return { cat: ui.cat, model: m.name, capacity: s.capacity, color: s.color, hex: s.hex, band: s.band || "", bandOption: s.bandOption || "", received: ui.received || "", supplierId: sup.id, supplierName: sup.name };
   }
   function renderPreview() {
     var it = currentItem(), pv = $("#pv");
     if (!it) { pv.innerHTML = '<div class="muted">ตัวอย่างสติ๊กเกอร์จะแสดงเมื่อเลือกครบทุกขั้นตอน</div>'; return; }
     pv.innerHTML = '<div class="row"><b>ตัวอย่างสติ๊กเกอร์</b><span class="spacer"></span><span class="small muted">ขนาดจริง ' + L().cellW + " × " + L().cellH + ' มม. (แสดงขยาย 2 เท่า)</span></div>' +
       '<div class="pvbox"><div class="zoom2">' + stickerHTML(tplFor(it.cat), valsOf(it)) + "</div></div>" +
+      '<div class="row" style="justify-content:center"><label for="rcv">วันที่รับสินค้า</label><input class="i" type="date" id="rcv" value="' + esc(ui.received) + '" style="width:auto"><button class="btn sm ghost" id="rcvt">วันนี้</button></div>' +
       '<div class="row" style="justify-content:center"><label>จำนวน</label><div class="qty"><button id="qm">−</button><input class="i" type="number" min="1" max="500" id="qn" value="' + ui.qty + '"><button id="qp">+</button></div>' +
       '<button class="btn ghost" id="qfill">เต็มแผ่น</button><button class="btn" id="add">+ เพิ่มลงแผ่น</button></div><div class="err" id="pverr"></div>';
     afterRender(pv, function (n) { $("#pverr").textContent = n ? "ข้อความยาวเกินช่องสติ๊กเกอร์ — แจ้งผู้ดูแลระบบให้ปรับเทมเพลต" : ""; });
+    $("#rcv").onchange = function () { ui.received = this.value; renderPreview(); };
+    $("#rcvt").onclick = function () { ui.received = today(); renderPreview(); };
     var setQ = function (v) { ui.qty = Math.max(1, Math.min(500, Math.round(Number(v) || 1))); $("#qn").value = ui.qty; };
     $("#qm").onclick = function () { setQ(ui.qty - 1); }; $("#qp").onclick = function () { setQ(ui.qty + 1); }; $("#qn").oninput = function () { setQ(this.value); };
     $("#qfill").onclick = function () { var per = L().cols * L().rows, used = (ui.start - 1 + totalQty()) % per; setQ(per - used || per); };
     $("#add").onclick = function () {
-      var key = JSON.stringify([it.cat, it.model, it.capacity, it.color, it.band, it.bandOption, it.supplierId]), ex = ui.queue.find(function (q) { return q.key === key; });
+      var key = JSON.stringify([it.cat, it.model, it.capacity, it.color, it.band, it.bandOption, it.supplierId, it.received]), ex = ui.queue.find(function (q) { return q.key === key; });
       if (ex) ex.qty += ui.qty; else ui.queue.push(Object.assign({ key: key, qty: ui.qty }, it));
       persist(); toast("เพิ่ม " + ui.qty + " ดวง: " + [it.model, it.capacity, it.color, it.band, it.bandOption].filter(Boolean).join(" ")); renderQueue();
     };
@@ -235,7 +241,7 @@
     var list = queueList(), sheets = buildSheets(list, ui.start, { pick: true, borders: true });
     box.innerHTML = '<div class="row"><b>รายการที่จะพิมพ์</b><span class="spacer"></span><span><b>' + list.length + "</b> ดวง · <b>" + (list.length ? sheets.length : 0) + "</b> แผ่น</span></div>" +
       (ui.queue.length ? '<div class="ql">' + ui.queue.map(function (q, i) {
-        return '<div class="qi"><div class="qt"><b>' + esc(q.model) + "</b> " + esc(q.capacity) + " · " + esc(q.color) + (q.band ? " · " + esc(q.band) + (q.bandOption ? " " + esc(q.bandOption) : "") : "") + '<div class="small muted">' + esc(q.supplierName) + '</div></div><input class="i" type="number" min="1" max="500" value="' + q.qty + '" data-qq="' + i + '"><button class="x" data-qx="' + i + '" title="ลบ">×</button></div>';
+        return '<div class="qi"><div class="qt"><b>' + esc(q.model) + "</b> " + esc(q.capacity) + " · " + esc(q.color) + (q.band ? " · " + esc(q.band) + (q.bandOption ? " " + esc(q.bandOption) : "") : "") + '<div class="small muted">' + (q.received ? "รับสินค้า " + esc(fmtDate(q.received)) + " · " : "") + esc(q.supplierName) + '</div></div><input class="i" type="number" min="1" max="500" value="' + q.qty + '" data-qq="' + i + '"><button class="x" data-qx="' + i + '" title="ลบ">×</button></div>';
       }).join("") + "</div>" : '<p class="muted small">ยังไม่มีรายการ — เลือกสินค้าแล้วกด "เพิ่มลงแผ่น"</p>') +
       '<div class="row" style="margin-top:8px"><label class="small">เริ่มพิมพ์ที่ช่อง</label><input class="i" type="number" min="1" max="' + per + '" id="start" value="' + ui.start + '" style="width:76px"><span class="small muted">กดช่องในตัวอย่างได้ (กระดาษที่ใช้ไปแล้วบางส่วน)</span></div>' +
       sheets.map(function (h, i) { return '<div class="sheetwrap">' + h + '</div><div class="sheetlabel">แผ่นที่ ' + (i + 1) + " / " + sheets.length + "</div>"; }).join("") +
@@ -462,7 +468,7 @@
   }
 
   // --- template designer
-  var EL_LABEL = { model: "รุ่น", capacity: "ความจุ / ขนาดตัวเรือน", color: "สีเครื่อง / สีตัวเรือน", band: "ประเภทสาย (Watch)", bandOption: "ตัวเลือกสาย (Watch)", supplier: "ซัพพลายเออร์", text: "ข้อความคงที่" };
+  var EL_LABEL = { model: "รุ่น", capacity: "ความจุ / ขนาดตัวเรือน", color: "สีเครื่อง / สีตัวเรือน", band: "ประเภทสาย (Watch)", bandOption: "ตัวเลือกสาย (Watch)", supplier: "ซัพพลายเออร์", received: "วันที่รับสินค้า", text: "ข้อความคงที่" };
   function adminTemplate() {
     var t = JSON.parse(JSON.stringify(A.templates[ui.tplCat]));
     var sm = A.models.filter(function (m) { return m.category === ui.tplCat; });
@@ -484,7 +490,7 @@
       var s = A.suppliers.find(function (x) { return x.id === sid; }) || { name: "Supplier" };
       var bd = (m.bands || [])[0];
       return { model: m.name, capacity: m.capacities[0] || (ui.tplCat === "Watch" ? "44mm" : "256GB"), color: m.colors[0] || { name: "สีตัวอย่าง", hex: "#3d4466" },
-        band: bd ? bd.name : (ui.tplCat === "Watch" ? "Sport Band" : ""), bandOption: bd ? (bd.options[0] || "") : (ui.tplCat === "Watch" ? "M/L" : ""), supplier: { name: s.name, logo: s.logo } };
+        band: bd ? bd.name : (ui.tplCat === "Watch" ? "Sport Band" : ""), bandOption: bd ? (bd.options[0] || "") : (ui.tplCat === "Watch" ? "M/L" : ""), received: today(), supplier: { name: s.name, logo: s.logo } };
     }
     function drawEls() {
       $("#tels").innerHTML = t.elements.map(function (e, i) {
