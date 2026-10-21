@@ -151,6 +151,17 @@ async function initDB() {
     await setSetting("removed:ipad-2026-10-21", { at: new Date().toISOString(), removed: r.map((x: any) => x.name) })
     console.log("[db] removed iPad models:", r.map((x: any) => x.name).join(", ") || "(none)")
   }
+  // Smile (htask-1792567413400): Watch keeps only SE 3 / Series 12 / Ultra 4 — every other Watch model is removed, once.
+  // Guard: runs only if all three kept models exist (so a renamed model can't make it delete everything).
+  if (!(await getSetting("removed:watch-2026-10-21"))) {
+    const keep = ["Apple Watch SE 3", "Apple Watch Series 12", "Apple Watch Ultra 4"]
+    const found = await sql`SELECT name FROM sticker_models WHERE category = 'Watch' AND name IN ${sql(keep)}`
+    if (found.length === keep.length) {
+      const r = await sql`DELETE FROM sticker_models WHERE category = 'Watch' AND name NOT IN ${sql(keep)} RETURNING name`
+      await setSetting("removed:watch-2026-10-21", { at: new Date().toISOString(), removed: r.map((x: any) => x.name) })
+      console.log("[db] removed Watch models:", r.map((x: any) => x.name).join(", ") || "(none)")
+    } else console.log("[db] Watch cleanup skipped — kept models not all found:", found.map((x: any) => x.name).join(", "))
+  }
   // Admin account: created from ADMIN_PASSWORD once, must be changed at first login.
   if (!(await getSetting("admin")) && process.env.ADMIN_PASSWORD) {
     await setSetting("admin", { hash: await Bun.password.hash(process.env.ADMIN_PASSWORD), mustChange: true, secret: randomBytes(32).toString("base64url"), ver: 1 })
