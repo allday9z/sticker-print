@@ -137,6 +137,13 @@ async function initDB() {
     }
     await setSetting("migrated:logo-box", true)
   }
+  // Smile (htask-1792562907236): remove these iPhone models (with their capacities / colours) — once.
+  if (!(await getSetting("removed:iphone-2026-10-21"))) {
+    const names = ["iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max", "iPhone 16e"]
+    const r = await sql`DELETE FROM sticker_models WHERE category = 'iPhone' AND name IN ${sql(names)} RETURNING name`
+    await setSetting("removed:iphone-2026-10-21", { at: new Date().toISOString(), removed: r.map((x: any) => x.name) })
+    console.log("[db] removed iPhone models:", r.map((x: any) => x.name).join(", ") || "(none)")
+  }
   // Admin account: created from ADMIN_PASSWORD once, must be changed at first login.
   if (!(await getSetting("admin")) && process.env.ADMIN_PASSWORD) {
     await setSetting("admin", { hash: await Bun.password.hash(process.env.ADMIN_PASSWORD), mustChange: true, secret: randomBytes(32).toString("base64url"), ver: 1 })
