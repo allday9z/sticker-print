@@ -382,7 +382,7 @@
   function adminPaper() {
     var l = L();
     var F = [["pageW", "ความกว้างกระดาษ (มม.)"], ["pageH", "ความสูงกระดาษ (มม.)"], ["cols", "จำนวนคอลัมน์"], ["rows", "จำนวนแถว"], ["cellW", "ความกว้างสติ๊กเกอร์ (มม.)"], ["cellH", "ความสูงสติ๊กเกอร์ (มม.)"], ["marginTop", "ขอบบน (มม.)"], ["marginLeft", "ขอบซ้าย (มม.)"], ["gapX", "ระยะห่างแนวนอน (มม.)"], ["gapY", "ระยะห่างแนวตั้ง (มม.)"], ["offsetX", "เลื่อนทั้งแผ่น ซ้าย(−)/ขวา(+)"], ["offsetY", "เลื่อนทั้งแผ่น ขึ้น(−)/ลง(+)"]];
-    $("#atab").innerHTML = '<div class="layout"><div class="card"><div class="row" style="margin-bottom:8px"><span class="small">ขนาดกระดาษสำเร็จรูป:</span><button class="btn sm ghost" data-ps="210x297">A4 แนวตั้ง</button><button class="btn sm ghost" data-ps="297x210">A4 แนวนอน</button><button class="btn sm ghost" data-ps="148x210">A5 แนวตั้ง</button></div>' +
+    $("#atab").innerHTML = '<div class="layout"><div class="card"><div class="row" style="margin-bottom:8px"><span class="small">ขนาดกระดาษสำเร็จรูป:</span><button class="btn sm ghost" data-ps="210x297">A4 แนวตั้ง</button></div>' +
       '<div class="grid4">' + F.map(function (f) { return field(f[1], '<input class="i" type="number" step="0.1" id="l_' + f[0] + '" value="' + l[f[0]] + '">'); }).join("") + "</div>" +
       '<label><input type="checkbox" id="l_showBorders"' + (l.showBorders ? " checked" : "") + "> พิมพ์เส้นขอบสติ๊กเกอร์</label>" +
       '<div class="err" id="lerr"></div><div class="row"><button class="btn" id="lsave">บันทึก</button><button class="btn ghost" id="ltest">พิมพ์หน้าทดสอบ (กรอบ + เลขช่อง)</button><button class="btn ghost" id="lreset">ค่าเริ่มต้น (A4 50 ช่อง)</button></div>' +
