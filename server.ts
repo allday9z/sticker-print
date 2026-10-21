@@ -39,7 +39,7 @@ type Layout = typeof DEFAULT_LAYOUT
 const FONTS = ["Helvetica", "Noto Sans Thai", "Sarabun", "Prompt", "Kanit"]
 const EL_TYPES = ["model", "capacity", "color", "band", "bandOption", "supplier", "received", "text"]
 // Last line of every label: the date the branch received the goods (entered on the branch page) — Smile, htask-1792569623133.
-const RECEIVED_EL = { type: "received", font: "Helvetica", size: 7, bold: false, italic: false, color: "#000000", align: "center", mt: 0.5, prefix: "รับสินค้า ", suffix: "" }
+const RECEIVED_EL = { type: "received", font: "Helvetica", size: 7, bold: false, italic: false, color: "#000000", align: "center", mt: 0.5, prefix: "", suffix: "" }   // date only (Smile, htask-1792571045003)
 // Default template = the look of Smile's sample (model / capacity / colour / logo, centred, 9 pt).
 // Logos fit a box (logoW × logoH mm, aspect kept) = the template's sizes: Synnex 21.3 × 3.0, VST ECS 19.05 × 6.35.
 const DEFAULT_TEMPLATE = {
@@ -174,6 +174,15 @@ async function initDB() {
       await setSetting("template:" + cat, t); console.log("[db] received-date line added to template", cat)
     }
     await setSetting("migrated:received-line", true)
+  }
+  // Date only, without the "รับสินค้า " prefix (Smile, htask-1792571045003) — saved templates still on that prefix, once.
+  if (!(await getSetting("migrated:received-noprefix"))) {
+    for (const cat of Object.keys(SEED_MODELS)) {
+      const t = await getSetting("template:" + cat); if (!t?.elements) continue
+      let n = 0; for (const e of t.elements) if (e.type === "received" && e.prefix === "รับสินค้า ") { e.prefix = ""; n++ }
+      if (n) { await setSetting("template:" + cat, t); console.log("[db] received-date prefix removed on template", cat) }
+    }
+    await setSetting("migrated:received-noprefix", true)
   }
   // Admin account: created from ADMIN_PASSWORD once, must be changed at first login.
   if (!(await getSetting("admin")) && process.env.ADMIN_PASSWORD) {
