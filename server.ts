@@ -50,6 +50,32 @@ const DEFAULT_TEMPLATE = {
   ],
 }
 
+// Product data from Smile's Excel "Apple_Product_Master_Data.xlsx" (htask-1792553683856) → data/apple-master.json:
+// capacities (Watch: case sizes), colours with the Excel font colour, Watch bands + size options. Runs once; only fills
+// models that still have no capacities / colours / bands (never overwrites what the admin entered); missing models are added.
+async function importMaster() {
+  if (await getSetting("imported:apple-master")) return
+  const d = JSON.parse(await Bun.file(resolve(import.meta.dir, "data", "apple-master.json")).text())
+  const done: string[] = [], skipped: string[] = []
+  await sql.begin(async (tx) => {
+    for (const cat of Object.keys(SEED_MODELS)) for (const m of d[cat] ?? []) {
+      let [row] = await tx`SELECT id FROM sticker_models WHERE category = ${cat} AND lower(name) = lower(${m.name}) ORDER BY id LIMIT 1`
+      if (!row) {
+        const [{ n }] = await tx`SELECT COALESCE(max(sort), -1) + 1 AS n FROM sticker_models WHERE category = ${cat}`;
+        [row] = await tx`INSERT INTO sticker_models (category, name, sort) VALUES (${cat}, ${m.name}, ${n}) RETURNING id`
+      }
+      const [{ k }] = await tx`SELECT (SELECT count(*) FROM sticker_capacities WHERE model_id = ${row.id}) + (SELECT count(*) FROM sticker_colors WHERE model_id = ${row.id}) + (SELECT count(*) FROM sticker_bands WHERE model_id = ${row.id}) AS k`
+      if (Number(k) > 0) { skipped.push(m.name); continue }
+      for (const [i, v] of m.capacities.entries()) await tx`INSERT INTO sticker_capacities (model_id, value, sort) VALUES (${row.id}, ${v}, ${i})`
+      for (const [i, c] of m.colors.entries()) await tx`INSERT INTO sticker_colors (model_id, name, hex, sizes, sort) VALUES (${row.id}, ${c.name}, ${c.hex}, ${JSON.stringify(c.sizes ?? [])}::jsonb, ${i})`
+      for (const [i, b] of (m.bands ?? []).entries()) await tx`INSERT INTO sticker_bands (model_id, name, sizes, options, sort) VALUES (${row.id}, ${b.name}, ${JSON.stringify(b.sizes ?? [])}::jsonb, ${JSON.stringify(b.options ?? [])}::jsonb, ${i})`
+      done.push(m.name)
+    }
+  })
+  await setSetting("imported:apple-master", { at: new Date().toISOString(), filled: done.length, skipped })
+  console.log("[db] product master imported:", done.length, "models filled", skipped.length ? "· kept existing: " + skipped.join(", ") : "")
+}
+
 async function initDB() {
   await sql`CREATE TABLE IF NOT EXISTS sticker_settings (key TEXT PRIMARY KEY, value JSONB NOT NULL)`
   await sql`CREATE TABLE IF NOT EXISTS sticker_models (id SERIAL PRIMARY KEY, category TEXT NOT NULL, name TEXT NOT NULL, sort INT NOT NULL DEFAULT 0, active BOOLEAN NOT NULL DEFAULT true)`
@@ -69,6 +95,7 @@ async function initDB() {
     if (n === 0) { for (const [i, m] of list.entries()) await sql`INSERT INTO sticker_models (category, name, sort) VALUES (${cat}, ${m}, ${i})`; console.log("[db] seeded", cat, "models", list.length) }
     await setSetting("seeded:" + cat, true)
   }
+  await importMaster()
   const [{ s }] = await sql`SELECT count(*)::int AS s FROM sticker_suppliers`
   if (s === 0) {
     for (const [i, [name, cats]] of SUPPLIERS.entries()) {

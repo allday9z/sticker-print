@@ -1,0 +1,2114 @@
+{
+ "source": "Apple_Product_Master_Data.xlsx (Smile, htask-1792553683856, last checked 21 Oct 2026)",
+ "iPhone": [
+  {
+   "name": "iPhone 15",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB"
+   ],
+   "colors": [
+    {
+     "name": "Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Green",
+     "hex": "#5e8f62",
+     "sizes": []
+    },
+    {
+     "name": "Yellow",
+     "hex": "#c49a1c",
+     "sizes": []
+    },
+    {
+     "name": "Pink",
+     "hex": "#db6a98",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 15 Plus",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB"
+   ],
+   "colors": [
+    {
+     "name": "Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Green",
+     "hex": "#5e8f62",
+     "sizes": []
+    },
+    {
+     "name": "Yellow",
+     "hex": "#c49a1c",
+     "sizes": []
+    },
+    {
+     "name": "Pink",
+     "hex": "#db6a98",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 15 Pro",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Black Titanium",
+     "hex": "#3a3a3c",
+     "sizes": []
+    },
+    {
+     "name": "White Titanium",
+     "hex": "#8f8c86",
+     "sizes": []
+    },
+    {
+     "name": "Blue Titanium",
+     "hex": "#3f4e66",
+     "sizes": []
+    },
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 15 Pro Max",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Black Titanium",
+     "hex": "#3a3a3c",
+     "sizes": []
+    },
+    {
+     "name": "White Titanium",
+     "hex": "#8f8c86",
+     "sizes": []
+    },
+    {
+     "name": "Blue Titanium",
+     "hex": "#3f4e66",
+     "sizes": []
+    },
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 16",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB"
+   ],
+   "colors": [
+    {
+     "name": "Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "White",
+     "hex": "#8a8a8e",
+     "sizes": []
+    },
+    {
+     "name": "Pink",
+     "hex": "#db6a98",
+     "sizes": []
+    },
+    {
+     "name": "Teal",
+     "hex": "#2a9494",
+     "sizes": []
+    },
+    {
+     "name": "Ultramarine",
+     "hex": "#4a4fd6",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 16 Plus",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB"
+   ],
+   "colors": [
+    {
+     "name": "Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "White",
+     "hex": "#8a8a8e",
+     "sizes": []
+    },
+    {
+     "name": "Pink",
+     "hex": "#db6a98",
+     "sizes": []
+    },
+    {
+     "name": "Teal",
+     "hex": "#2a9494",
+     "sizes": []
+    },
+    {
+     "name": "Ultramarine",
+     "hex": "#4a4fd6",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 16 Pro",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Black Titanium",
+     "hex": "#3a3a3c",
+     "sizes": []
+    },
+    {
+     "name": "White Titanium",
+     "hex": "#8f8c86",
+     "sizes": []
+    },
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Desert Titanium",
+     "hex": "#a87e55",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 16 Pro Max",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Black Titanium",
+     "hex": "#3a3a3c",
+     "sizes": []
+    },
+    {
+     "name": "White Titanium",
+     "hex": "#8f8c86",
+     "sizes": []
+    },
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Desert Titanium",
+     "hex": "#a87e55",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 16e",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB"
+   ],
+   "colors": [
+    {
+     "name": "Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "White",
+     "hex": "#8a8a8e",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 17",
+   "capacities": [
+    "256GB",
+    "512GB"
+   ],
+   "colors": [
+    {
+     "name": "Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "White",
+     "hex": "#8a8a8e",
+     "sizes": []
+    },
+    {
+     "name": "Mist Blue",
+     "hex": "#5d86b0",
+     "sizes": []
+    },
+    {
+     "name": "Sage",
+     "hex": "#6f8763",
+     "sizes": []
+    },
+    {
+     "name": "Lavender",
+     "hex": "#8b74be",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 17 Pro",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Silver",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Cosmic Orange",
+     "hex": "#e2611f",
+     "sizes": []
+    },
+    {
+     "name": "Deep Blue",
+     "hex": "#283e68",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 17 Pro Max",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB",
+    "2TB"
+   ],
+   "colors": [
+    {
+     "name": "Silver",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Cosmic Orange",
+     "hex": "#e2611f",
+     "sizes": []
+    },
+    {
+     "name": "Deep Blue",
+     "hex": "#283e68",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone Air",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Cloud White",
+     "hex": "#8e8c88",
+     "sizes": []
+    },
+    {
+     "name": "Light Gold",
+     "hex": "#b8975a",
+     "sizes": []
+    },
+    {
+     "name": "Sky Blue",
+     "hex": "#4f8cc4",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 17e",
+   "capacities": [
+    "256GB",
+    "512GB"
+   ],
+   "colors": [
+    {
+     "name": "Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "White",
+     "hex": "#8a8a8e",
+     "sizes": []
+    },
+    {
+     "name": "Soft Pink",
+     "hex": "#d4708f",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 18 Pro",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Silver",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Glacier",
+     "hex": "#5f93ae",
+     "sizes": []
+    },
+    {
+     "name": "Burgundy",
+     "hex": "#7a1f35",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone 18 Pro Max",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB",
+    "2TB"
+   ],
+   "colors": [
+    {
+     "name": "Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Silver",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Glacier",
+     "hex": "#5f93ae",
+     "sizes": []
+    },
+    {
+     "name": "Burgundy",
+     "hex": "#7a1f35",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPhone Duo",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB",
+    "2TB"
+   ],
+   "colors": [
+    {
+     "name": "Star White",
+     "hex": "#948e82",
+     "sizes": []
+    },
+    {
+     "name": "Night Sky",
+     "hex": "#2b3550",
+     "sizes": []
+    }
+   ]
+  }
+ ],
+ "iPad": [
+  {
+   "name": "iPad (A16)",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB"
+   ],
+   "colors": [
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Pink",
+     "hex": "#db6a98",
+     "sizes": []
+    },
+    {
+     "name": "Yellow",
+     "hex": "#c49a1c",
+     "sizes": []
+    },
+    {
+     "name": "Silver",
+     "hex": "#868a90",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad mini (A17 Pro)",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB"
+   ],
+   "colors": [
+    {
+     "name": "Space Gray",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Purple",
+     "hex": "#7e61b3",
+     "sizes": []
+    },
+    {
+     "name": "Starlight",
+     "hex": "#b09a6e",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Air 11-inch (M2)",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Gray",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Purple",
+     "hex": "#7e61b3",
+     "sizes": []
+    },
+    {
+     "name": "Starlight",
+     "hex": "#b09a6e",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Air 13-inch (M2)",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Gray",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Purple",
+     "hex": "#7e61b3",
+     "sizes": []
+    },
+    {
+     "name": "Starlight",
+     "hex": "#b09a6e",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Air 11-inch (M3)",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Gray",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Purple",
+     "hex": "#7e61b3",
+     "sizes": []
+    },
+    {
+     "name": "Starlight",
+     "hex": "#b09a6e",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Air 13-inch (M3)",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Gray",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Purple",
+     "hex": "#7e61b3",
+     "sizes": []
+    },
+    {
+     "name": "Starlight",
+     "hex": "#b09a6e",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Air 11-inch (M4)",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Gray",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Purple",
+     "hex": "#7e61b3",
+     "sizes": []
+    },
+    {
+     "name": "Starlight",
+     "hex": "#b09a6e",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Air 13-inch (M4)",
+   "capacities": [
+    "128GB",
+    "256GB",
+    "512GB",
+    "1TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Gray",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Blue",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "Purple",
+     "hex": "#7e61b3",
+     "sizes": []
+    },
+    {
+     "name": "Starlight",
+     "hex": "#b09a6e",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Pro 11-inch (M4)",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB",
+    "2TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Silver",
+     "hex": "#868a90",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Pro 13-inch (M4)",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB",
+    "2TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Silver",
+     "hex": "#868a90",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Pro 11-inch (M5)",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB",
+    "2TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Silver",
+     "hex": "#868a90",
+     "sizes": []
+    }
+   ]
+  },
+  {
+   "name": "iPad Pro 13-inch (M5)",
+   "capacities": [
+    "256GB",
+    "512GB",
+    "1TB",
+    "2TB"
+   ],
+   "colors": [
+    {
+     "name": "Space Black",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Silver",
+     "hex": "#868a90",
+     "sizes": []
+    }
+   ]
+  }
+ ],
+ "Watch": [
+  {
+   "name": "Apple Watch SE",
+   "capacities": [
+    "40mm",
+    "44mm"
+   ],
+   "colors": [
+    {
+     "name": "Silver Aluminum",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Space Gray Aluminum",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Gold Aluminum",
+     "hex": "#b8955c",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Braided Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Series 6",
+   "capacities": [
+    "40mm",
+    "44mm"
+   ],
+   "colors": [
+    {
+     "name": "Silver Aluminum",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Space Gray Aluminum",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Gold Aluminum",
+     "hex": "#b8955c",
+     "sizes": []
+    },
+    {
+     "name": "Blue Aluminum",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "(PRODUCT)RED Aluminum",
+     "hex": "#c8102e",
+     "sizes": []
+    },
+    {
+     "name": "Silver Stainless Steel",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Graphite Stainless Steel",
+     "hex": "#48484c",
+     "sizes": []
+    },
+    {
+     "name": "Gold Stainless Steel",
+     "hex": "#b8955c",
+     "sizes": []
+    },
+    {
+     "name": "Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Space Black Titanium",
+     "hex": "#2c2c2e",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Braided Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Milanese Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Link Bracelet",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch SE (2nd generation)",
+   "capacities": [
+    "40mm",
+    "44mm"
+   ],
+   "colors": [
+    {
+     "name": "Midnight Aluminum",
+     "hex": "#222b3d",
+     "sizes": []
+    },
+    {
+     "name": "Starlight Aluminum",
+     "hex": "#b09a6e",
+     "sizes": []
+    },
+    {
+     "name": "Silver Aluminum",
+     "hex": "#868a90",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Braided Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Series 7",
+   "capacities": [
+    "41mm",
+    "45mm"
+   ],
+   "colors": [
+    {
+     "name": "Midnight Aluminum",
+     "hex": "#222b3d",
+     "sizes": []
+    },
+    {
+     "name": "Starlight Aluminum",
+     "hex": "#b09a6e",
+     "sizes": []
+    },
+    {
+     "name": "Green Aluminum",
+     "hex": "#5e8f62",
+     "sizes": []
+    },
+    {
+     "name": "Blue Aluminum",
+     "hex": "#4a78b5",
+     "sizes": []
+    },
+    {
+     "name": "(PRODUCT)RED Aluminum",
+     "hex": "#c8102e",
+     "sizes": []
+    },
+    {
+     "name": "Silver Stainless Steel",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Graphite Stainless Steel",
+     "hex": "#48484c",
+     "sizes": []
+    },
+    {
+     "name": "Gold Stainless Steel",
+     "hex": "#b8955c",
+     "sizes": []
+    },
+    {
+     "name": "Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Space Black Titanium",
+     "hex": "#2c2c2e",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Braided Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Milanese Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Link Bracelet",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Series 8",
+   "capacities": [
+    "41mm",
+    "45mm"
+   ],
+   "colors": [
+    {
+     "name": "Midnight Aluminum",
+     "hex": "#222b3d",
+     "sizes": []
+    },
+    {
+     "name": "Starlight Aluminum",
+     "hex": "#b09a6e",
+     "sizes": []
+    },
+    {
+     "name": "Silver Aluminum",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "(PRODUCT)RED Aluminum",
+     "hex": "#c8102e",
+     "sizes": []
+    },
+    {
+     "name": "Silver Stainless Steel",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Graphite Stainless Steel",
+     "hex": "#48484c",
+     "sizes": []
+    },
+    {
+     "name": "Gold Stainless Steel",
+     "hex": "#b8955c",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Braided Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Milanese Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Link Bracelet",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Ultra",
+   "capacities": [
+    "49mm"
+   ],
+   "colors": [
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Alpine Loop",
+     "sizes": [],
+     "options": [
+      "S",
+      "M",
+      "L"
+     ]
+    },
+    {
+     "name": "Trail Loop",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Ocean Band",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Series 9",
+   "capacities": [
+    "41mm",
+    "45mm"
+   ],
+   "colors": [
+    {
+     "name": "Midnight Aluminum",
+     "hex": "#222b3d",
+     "sizes": []
+    },
+    {
+     "name": "Starlight Aluminum",
+     "hex": "#b09a6e",
+     "sizes": []
+    },
+    {
+     "name": "Silver Aluminum",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Pink Aluminum",
+     "hex": "#db6a98",
+     "sizes": []
+    },
+    {
+     "name": "(PRODUCT)RED Aluminum",
+     "hex": "#c8102e",
+     "sizes": []
+    },
+    {
+     "name": "Gold Stainless Steel",
+     "hex": "#b8955c",
+     "sizes": []
+    },
+    {
+     "name": "Silver Stainless Steel",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Graphite Stainless Steel",
+     "hex": "#48484c",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Braided Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Milanese Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Link Bracelet",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Ultra 2",
+   "capacities": [
+    "49mm"
+   ],
+   "colors": [
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Black Titanium",
+     "hex": "#3a3a3c",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Alpine Loop",
+     "sizes": [],
+     "options": [
+      "S",
+      "M",
+      "L"
+     ]
+    },
+    {
+     "name": "Trail Loop",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Ocean Band",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Titanium Milanese Loop",
+     "sizes": [],
+     "options": [
+      "S",
+      "M",
+      "L"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Series 10",
+   "capacities": [
+    "42mm",
+    "46mm"
+   ],
+   "colors": [
+    {
+     "name": "Jet Black Aluminum",
+     "hex": "#0f0f10",
+     "sizes": []
+    },
+    {
+     "name": "Rose Gold Aluminum",
+     "hex": "#c2806e",
+     "sizes": []
+    },
+    {
+     "name": "Silver Aluminum",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Gold Titanium",
+     "hex": "#b08a45",
+     "sizes": []
+    },
+    {
+     "name": "Slate Titanium",
+     "hex": "#565c64",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Braided Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Milanese Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Link Bracelet",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch SE 3",
+   "capacities": [
+    "40mm",
+    "44mm"
+   ],
+   "colors": [
+    {
+     "name": "Midnight Aluminum",
+     "hex": "#222b3d",
+     "sizes": []
+    },
+    {
+     "name": "Starlight Aluminum",
+     "hex": "#b09a6e",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Series 11",
+   "capacities": [
+    "42mm",
+    "46mm"
+   ],
+   "colors": [
+    {
+     "name": "Jet Black Aluminum",
+     "hex": "#0f0f10",
+     "sizes": []
+    },
+    {
+     "name": "Rose Gold Aluminum",
+     "hex": "#c2806e",
+     "sizes": []
+    },
+    {
+     "name": "Silver Aluminum",
+     "hex": "#868a90",
+     "sizes": []
+    },
+    {
+     "name": "Space Gray Aluminum",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Gold Titanium",
+     "hex": "#b08a45",
+     "sizes": []
+    },
+    {
+     "name": "Slate Titanium",
+     "hex": "#565c64",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Magnetic Link",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Milanese Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Link Bracelet",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Ultra 3",
+   "capacities": [
+    "49mm"
+   ],
+   "colors": [
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Black Titanium",
+     "hex": "#3a3a3c",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Alpine Loop",
+     "sizes": [],
+     "options": [
+      "S",
+      "M",
+      "L"
+     ]
+    },
+    {
+     "name": "Trail Loop",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Ocean Band",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Titanium Milanese Loop",
+     "sizes": [],
+     "options": [
+      "S",
+      "M",
+      "L"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Series 12",
+   "capacities": [
+    "42mm",
+    "46mm"
+   ],
+   "colors": [
+    {
+     "name": "Dark Bronze Aluminum",
+     "hex": "#6b4e37",
+     "sizes": []
+    },
+    {
+     "name": "Light Gold Aluminum",
+     "hex": "#b8975a",
+     "sizes": []
+    },
+    {
+     "name": "Black Aluminum",
+     "hex": "#1c1c1e",
+     "sizes": []
+    },
+    {
+     "name": "Space Gray Aluminum",
+     "hex": "#55575c",
+     "sizes": []
+    },
+    {
+     "name": "Radiant Gold Titanium",
+     "hex": "#bf9638",
+     "sizes": []
+    },
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Pearl White Ceramic",
+     "hex": "#a39e94",
+     "sizes": []
+    },
+    {
+     "name": "Night Blue Ceramic",
+     "hex": "#1f2f55",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Solo Loop",
+     "sizes": [],
+     "options": [
+      "Size 1",
+      "Size 2",
+      "Size 3",
+      "Size 4",
+      "Size 5",
+      "Size 6",
+      "Size 7",
+      "Size 8",
+      "Size 9",
+      "Size 10",
+      "Size 11",
+      "Size 12"
+     ]
+    },
+    {
+     "name": "Magnetic Link",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Band",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Nike Sport Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Milanese Loop",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Link Bracelet",
+     "sizes": [],
+     "options": []
+    }
+   ]
+  },
+  {
+   "name": "Apple Watch Ultra 4",
+   "capacities": [
+    "49mm"
+   ],
+   "colors": [
+    {
+     "name": "Natural Titanium",
+     "hex": "#8f8574",
+     "sizes": []
+    },
+    {
+     "name": "Black Titanium",
+     "hex": "#1c1c1e",
+     "sizes": []
+    }
+   ],
+   "bands": [
+    {
+     "name": "Alpine Loop",
+     "sizes": [],
+     "options": [
+      "S",
+      "M",
+      "L"
+     ]
+    },
+    {
+     "name": "Trail Loop",
+     "sizes": [],
+     "options": [
+      "S/M",
+      "M/L"
+     ]
+    },
+    {
+     "name": "Ocean Band",
+     "sizes": [],
+     "options": []
+    },
+    {
+     "name": "Titanium Milanese Loop",
+     "sizes": [],
+     "options": [
+      "S",
+      "M",
+      "L"
+     ]
+    }
+   ]
+  }
+ ]
+}
