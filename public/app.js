@@ -123,7 +123,7 @@
     return sheets.map(function (cells, si) {
       return '<div class="sheet" data-sheet="' + si + '" style="width:' + l.pageW + "mm;height:" + l.pageH + 'mm">' + cells.map(function (x, i) {
         var p = cellPos(i), cls = "cell" + (l.showBorders || o.borders ? " bordered" : "") + (x === "skip" ? " skip" : x ? "" : " empty") + (o.pick && si === 0 ? " pick" : "");
-        var inner = x && x !== "skip" ? stickerHTML(x.tpl, x.vals) : o.numbers ? '<div class="numcell">' + (i + 1) + "</div>" : "";
+        var inner = x && x !== "skip" ? (x.html || stickerHTML(x.tpl, x.vals)) : o.numbers ? '<div class="numcell">' + (i + 1) + "</div>" : "";
         return '<div class="' + cls + '" data-i="' + i + '" style="left:' + p.left + "mm;top:" + p.top + "mm;width:" + l.cellW + "mm;height:" + l.cellH + 'mm">' + inner + "</div>";
       }).join("") + "</div>";
     });
@@ -251,6 +251,104 @@
     $("#print").onclick = function () { printSheets(buildSheets(queueList(), ui.start)); };
   }
 
+  /* ================= admin: tick sheets ================= */
+  // One sticker per model listing every capacity / colour (Watch: case size / colour / band + size) with a tick box,
+  // for Smile to print and send to the shops, who tick the details by hand. Supplier per sheet or per item.
+  var tk = { cat: "iPhone", sel: [], qty: 1, sup: "", queue: [], start: 1, bandSizes: true };
+  try { var tks = JSON.parse(localStorage.getItem("sp2tick") || "{}"); ["cat", "queue", "start", "sup", "bandSizes"].forEach(function (k) { if (tks[k] != null) tk[k] = tks[k]; }); } catch (e) {}
+  function tkSave() { try { localStorage.setItem("sp2tick", JSON.stringify({ cat: tk.cat, queue: tk.queue, start: tk.start, sup: tk.sup, bandSizes: tk.bandSizes })); } catch (e) {} }
+  var TICK_FIT = {};   // content key → font size (pt) that fits the label
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { TICK_FIT = {}; if (ui.adminTab === "tick" && $("#tkqueue")) adminTick(); });
+  function tickBody(m, sup) {
+    var box = function (t, color) { return '<span class="ti"><span class="cb"></span>' + (color ? '<span style="color:' + esc(color) + '">' + esc(t) + "</span>" : esc(t)) + "</span>"; };
+    var line = function (items) { return items.length ? '<div class="tl">' + items.join("") + "</div>" : ""; };
+    var h = '<div class="tm">' + esc(m.name) + "</div>" + line((m.capacities || []).map(function (c) { return box(c); })) +
+      line((m.colors || []).map(function (c) { return box(c.name, c.hex); }));
+    if (m.category === "Watch") h += line((m.bands || []).map(function (b) {
+      var o = b.options || [];
+      return '<span class="ti"><span class="cb"></span>' + esc(b.name) + (tk.bandSizes && o.length ? (o.length <= 4 ? ' <span class="to">(' + o.map(function (x) { return '<span class="cb"></span>' + esc(x); }).join(" ") + ")</span>" : ' <span class="to">ไซซ์ ____</span>') : "") + "</span>";
+    }));
+    if (sup) h += '<div class="tsup">' + (sup.logo ? logoImg(sup.logo, sup.name, 16, 4.2, "mm", "lg") : "<b>" + esc(sup.name) + "</b>") + "</div>";
+    return h;
+  }
+  function tickHTML(m, sup, pt) { var l = L(); return '<div class="stk tick" style="width:' + l.cellW + "mm;height:" + l.cellH + "mm;font-size:" + pt + 'pt">' + tickBody(m, sup) + "</div>"; }
+  function tickKey(m, sup) { return [m.id, sup ? sup.id : 0, tk.bandSizes, L().cellW, L().cellH, JSON.stringify([m.name, m.capacities, m.colors, m.bands])].join("|"); }
+  // Largest font (7 → 3.5 pt) at which the label's content fits, measured off-screen at real size.
+  function fitTick(m, sup) {
+    var k = tickKey(m, sup); if (TICK_FIT[k]) return TICK_FIT[k];
+    var host = $("#tickMeasure") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "tickMeasure" }));
+    var pt = 7;
+    for (; pt > 3.5; pt -= 0.25) { host.innerHTML = tickHTML(m, sup, pt); var st = host.firstChild; if (st.scrollHeight <= st.clientHeight + 0.5 && st.scrollWidth <= st.clientWidth + 0.5) break; }
+    host.innerHTML = ""; return (TICK_FIT[k] = pt);
+  }
+  function tkModel(q) { return C.models.find(function (m) { return m.id === q.modelId; }); }
+  function tkSup(id) { return id ? C.suppliers.find(function (s) { return s.id === id; }) || null : null; }
+  function tickList() {
+    var out = [];
+    tk.queue.forEach(function (q) { var m = tkModel(q); if (!m) return; var sup = tkSup(q.supplierId), h = tickHTML(m, sup, fitTick(m, sup)); for (var i = 0; i < q.qty; i++) out.push({ html: h }); });
+    return out;
+  }
+  function adminTick() {
+    var cats = C.categories, models = modelsOf(tk.cat), sups = suppliersFor(tk.cat);
+    if (tk.sup && !sups.some(function (s) { return String(s.id) === String(tk.sup); })) tk.sup = "";
+    var supOpts = function (cur, list) { return '<option value="">ไม่ใส่ซัพพลายเออร์</option>' + list.map(function (s) { return '<option value="' + s.id + '"' + (String(cur) === String(s.id) ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join(""); };
+    $("#atab").innerHTML = '<div class="layout"><div class="card">' +
+      '<h2 style="margin-top:0">พิมพ์สติ๊กเกอร์แบบติ๊ก (สำหรับผู้ดูแล)</h2><p class="sub">1 ดวง = 1 รุ่น รวมความจุ / สี' + (tk.cat === "Watch" ? " / ขนาด / สาย" : "") + ' พร้อมช่องให้หน้าร้านติ๊กเอง — ตัวอักษรย่อให้พอดีดวงอัตโนมัติ</p>' +
+      '<div class="tabs">' + cats.map(function (c) { return '<button class="tab sm' + (tk.cat === c ? " on" : "") + '" data-tkc="' + c + '">' + c + "</button>"; }).join("") + "</div>" +
+      '<div class="row"><b>เลือกรุ่น</b><span class="spacer"></span><button class="btn sm ghost" id="tkall">เลือกทั้งหมด</button><button class="btn sm ghost" id="tknone">ล้าง</button></div>' +
+      '<div class="opts">' + models.map(function (m) { var on = tk.sel.indexOf(m.id) > -1, empty = !(m.capacities || []).length && !(m.colors || []).length;
+        return '<button class="opt' + (on ? " on" : "") + '" data-tkm="' + m.id + '"' + (empty ? ' title="ยังไม่มีข้อมูลความจุ/สี"' : "") + ">" + esc(m.name) + (empty ? ' <span class="small muted">(ไม่มีข้อมูล)</span>' : "") + "</button>"; }).join("") + "</div>" +
+      '<div class="grid2" style="margin-top:10px">' + field("ซัพพลายเออร์", '<select class="i" id="tksup">' + supOpts(tk.sup, sups) + "</select>") +
+      field("จำนวนต่อรุ่น (ดวง)", '<input class="i" type="number" min="1" max="50" id="tkq" value="' + tk.qty + '">') + "</div>" +
+      (tk.cat === "Watch" ? '<label class="small"><input type="checkbox" id="tkbs"' + (tk.bandSizes ? " checked" : "") + "> ใส่ไซซ์สาย (เช่น S/M · M/L, ไซซ์เยอะใส่เป็น \"ไซซ์ ____\")</label>" : "") +
+      '<div class="row" style="margin-top:10px"><span class="spacer"></span><button class="btn" id="tkadd"' + (tk.sel.length ? "" : " disabled") + ">+ เพิ่ม " + tk.sel.length + " รุ่นลงแผ่น</button></div>" +
+      '<div class="center small muted" style="margin-top:12px">ตัวอย่าง (ขยาย 2 เท่า)</div><div class="pvbox"><div class="zoom2" id="tkpv"></div></div>' +
+      '</div><div class="card" id="tkqueue"></div></div>';
+    var first = models.find(function (m) { return tk.sel.indexOf(m.id) > -1; }) || models[0];
+    var drawPv = function () { var sup = tkSup(Number(tk.sup)); $("#tkpv").innerHTML = first ? tickHTML(first, sup, fitTick(first, sup)) : '<div class="muted">ยังไม่มีรุ่น</div>'; };
+    drawPv();
+    $$("[data-tkc]").forEach(function (b) { b.onclick = function () { tk.cat = b.dataset.tkc; tk.sel = []; tkSave(); adminTick(); }; });
+    $$("[data-tkm]").forEach(function (b) { b.onclick = function () { var id = Number(b.dataset.tkm), i = tk.sel.indexOf(id); if (i > -1) tk.sel.splice(i, 1); else tk.sel.push(id); adminTick(); }; });
+    $("#tkall").onclick = function () { tk.sel = models.map(function (m) { return m.id; }); adminTick(); };
+    $("#tknone").onclick = function () { tk.sel = []; adminTick(); };
+    $("#tksup").onchange = function () { tk.sup = this.value; tkSave(); drawPv(); };
+    $("#tkq").onchange = function () { tk.qty = Math.max(1, Math.min(50, Math.round(Number(this.value) || 1))); this.value = tk.qty; };
+    if ($("#tkbs")) $("#tkbs").onchange = function () { tk.bandSizes = this.checked; tkSave(); drawPv(); tickQueue(); };
+    $("#tkadd").onclick = function () {
+      models.filter(function (m) { return tk.sel.indexOf(m.id) > -1; }).forEach(function (m) { tk.queue.push({ modelId: m.id, cat: tk.cat, supplierId: tk.sup ? Number(tk.sup) : 0, qty: tk.qty }); });
+      toast("เพิ่ม " + tk.sel.length + " รุ่นแล้ว"); tk.sel = []; tkSave(); adminTick();
+    };
+    tickQueue();
+  }
+  function tickQueue() {
+    var box = $("#tkqueue"); if (!box) return;
+    var l = L(), per = l.cols * l.rows; if (tk.start > per) tk.start = 1;
+    tk.queue = tk.queue.filter(function (q) { return tkModel(q); });
+    var list = tickList(), sheets = buildSheets(list, tk.start, { pick: true, borders: true });
+    var allSups = C.suppliers;
+    box.innerHTML = '<div class="row"><b>รายการที่จะพิมพ์</b><span class="spacer"></span><span><b>' + list.length + "</b> ดวง · <b>" + (list.length ? sheets.length : 0) + "</b> แผ่น</span></div>" +
+      (tk.queue.length ? '<div class="row" style="margin:6px 0"><label class="small">เปลี่ยนซัพพลายเออร์ทุกรายการ</label><select class="i" id="tkallsup" style="max-width:200px"><option value="-">— เลือก —</option><option value="0">ไม่ใส่ซัพพลายเออร์</option>' +
+        allSups.map(function (s) { return '<option value="' + s.id + '">' + esc(s.name) + "</option>"; }).join("") + "</select></div>" +
+        '<div class="ql">' + tk.queue.map(function (q, i) { var m = tkModel(q), sups = suppliersFor(m.category);
+          return '<div class="qi"><div class="qt"><b>' + esc(m.name) + '</b><div><select class="i sm" data-tks="' + i + '">' + '<option value="0">ไม่ใส่ซัพพลายเออร์</option>' + sups.map(function (s) { return '<option value="' + s.id + '"' + (q.supplierId === s.id ? " selected" : "") + ">" + esc(s.name) + "</option>"; }).join("") + "</select></div></div>" +
+            '<input class="i" type="number" min="1" max="50" value="' + q.qty + '" data-tkq="' + i + '"><button class="x" data-tkx="' + i + '" title="ลบ">×</button></div>'; }).join("") + "</div>"
+        : '<p class="muted small">ยังไม่มีรายการ — เลือกรุ่นแล้วกด "เพิ่มลงแผ่น"</p>') +
+      '<div class="row" style="margin-top:8px"><label class="small">เริ่มพิมพ์ที่ช่อง</label><input class="i" type="number" min="1" max="' + per + '" id="tkstart" value="' + tk.start + '" style="width:76px"><span class="small muted">กดช่องในตัวอย่างได้</span></div>' +
+      sheets.map(function (h, i) { return '<div class="sheetwrap">' + h + '</div><div class="sheetlabel">แผ่นที่ ' + (i + 1) + " / " + sheets.length + "</div>"; }).join("") +
+      '<div class="row"><button class="btn ghost" id="tkclear"' + (list.length ? "" : " disabled") + '>ล้างรายการ</button><span class="spacer"></span><button class="btn" id="tkprint"' + (list.length ? "" : " disabled") + ">พิมพ์ " + (list.length ? sheets.length + " แผ่น" : "") + "</button></div>" +
+      '<p class="small muted" style="margin:10px 0 0">ตอนพิมพ์: สเกล <b>100% (ขนาดจริง)</b> ไม่เลือก "พอดีหน้ากระดาษ" · ปิดหัว-ท้ายกระดาษ</p>';
+    scaleSheets(box, box.clientWidth - 34);
+    var redraw = function () { tkSave(); tickQueue(); };
+    if ($("#tkallsup")) $("#tkallsup").onchange = function () { var v = this.value; if (v === "-") return; tk.queue.forEach(function (q) { var ok = v === "0" || suppliersFor(q.cat).some(function (s) { return String(s.id) === v; }); if (ok) q.supplierId = Number(v); }); redraw(); };
+    $$("[data-tks]").forEach(function (sl) { sl.onchange = function () { tk.queue[Number(sl.dataset.tks)].supplierId = Number(sl.value); redraw(); }; });
+    $$("[data-tkq]").forEach(function (inp) { inp.onchange = function () { tk.queue[Number(inp.dataset.tkq)].qty = Math.max(1, Math.min(50, Math.round(Number(inp.value) || 1))); redraw(); }; });
+    $$("[data-tkx]").forEach(function (x) { x.onclick = function () { tk.queue.splice(Number(x.dataset.tkx), 1); redraw(); }; });
+    $("#tkstart").onchange = function () { tk.start = Math.max(1, Math.min(per, Math.round(Number(this.value) || 1))); redraw(); };
+    $$('.sheet[data-sheet="0"] .cell.pick', box).forEach(function (c) { c.onclick = function () { tk.start = Number(c.dataset.i) + 1; redraw(); }; });
+    $("#tkclear").onclick = function () { if (confirm("ล้างรายการทั้งหมด?")) { tk.queue = []; redraw(); } };
+    $("#tkprint").onclick = function () { printSheets(buildSheets(tickList(), tk.start)); };
+  }
+
   /* ================= admin ================= */
   function loginView() {
     setView('<div class="card" style="max-width:380px;margin:8vh auto"><h1>ผู้ดูแลระบบ</h1><p class="sub">จัดการข้อมูลสินค้า เทมเพลต และขนาดกระดาษ</p>' +
@@ -273,12 +371,12 @@
     if (!C.admin) return loginView();
     if (C.mustChange) { var pv = passwordView(true); setView(pv.html); return pv.bind(); }
     try { A = await api("/api/admin/catalog"); await prepLogos(A.suppliers.filter(function (s) { return s.logo && !LOGO[s.logo]; })); } catch (e) { if (e.status === 401) { C.admin = false; return loginView(); } if (e.code === "mustchange") { C.mustChange = true; return viewAdmin(); } throw e; }
-    var tabs = [["products", "ข้อมูลสินค้า"], ["suppliers", "ซัพพลายเออร์"], ["template", "เทมเพลต"], ["paper", "ขนาดกระดาษ"], ["account", "บัญชี"]];
+    var tabs = [["tick", "พิมพ์แบบติ๊ก"], ["products", "ข้อมูลสินค้า"], ["suppliers", "ซัพพลายเออร์"], ["template", "เทมเพลต"], ["paper", "ขนาดกระดาษ"], ["account", "บัญชี"]];
     setView('<div class="row"><div><h1>ผู้ดูแลระบบ</h1><p class="sub">เฉพาะผู้ดูแลแก้ไขได้ — หน้าสาขาเลือกและพิมพ์ได้อย่างเดียว</p></div><span class="spacer"></span><button class="btn ghost" id="logout">ออกจากระบบ</button></div>' +
       '<div class="tabs">' + tabs.map(function (t) { return '<button class="tab' + (ui.adminTab === t[0] ? " on" : "") + '" data-at="' + t[0] + '">' + t[1] + "</button>"; }).join("") + '</div><div id="atab"></div>');
     $$("[data-at]").forEach(function (b) { b.onclick = function () { ui.adminTab = b.dataset.at; viewAdmin(); }; });
     $("#logout").onclick = async function () { await api("/api/admin/logout", { method: "POST", body: {} }); C.admin = false; location.hash = "#/"; };
-    ({ products: adminProducts, suppliers: adminSuppliers, template: adminTemplate, paper: adminPaper, account: adminAccount })[ui.adminTab]();
+    ({ tick: adminTick, products: adminProducts, suppliers: adminSuppliers, template: adminTemplate, paper: adminPaper, account: adminAccount })[ui.adminTab]();
   }
   async function refresh() { var adm = C && C.admin; C = await api("/api/catalog"); if (adm && !C.admin) C.admin = false; await prepLogos(C.suppliers); applyPageSize(); }
   function act(fn) { return async function () { try { await fn.apply(this, arguments); } catch (e) { if (e.status === 401) { C.admin = false; return loginView(); } alert(e.message); } }; }

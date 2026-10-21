@@ -126,3 +126,16 @@ input.i:focus, select.i:focus, textarea.i:focus { border-color: var(--accent); }
 .crowin input[type=color] { width: 52px; height: 38px; padding: 2px; border: 1.5px solid #d6dbe0; border-radius: 8px; background: #fff; }
 .sizes { display: flex; flex-wrap: wrap; gap: 10px; margin: 4px 2px 0; }
 .substep { margin: -4px 0 10px 32px; display: flex; flex-direction: column; gap: 6px; }
+
+/* tick sheets (admin): every option with a box the shop ticks by hand */
+#tickMeasure { position: fixed; left: -10000px; top: 0; visibility: hidden; pointer-events: none; }
+.stk.tick { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0.9mm; overflow: hidden; font-family: "Helvetica Neue", Helvetica, Arial, "Noto Sans Thai", sans-serif; line-height: 1.12; color: #000; text-align: center; box-sizing: border-box; }
+.stk.tick .tm { font-weight: 700; font-size: 1.2em; margin-bottom: 0.15em; }
+.stk.tick .tl { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.1em 0.6em; margin-top: 0.2em; }
+.stk.tick .ti { white-space: nowrap; }
+.stk.tick .to { font-size: 0.9em; }
+.stk.tick .cb { display: inline-block; width: 0.8em; height: 0.8em; border: 0.15mm solid #000; border-radius: 0.12em; margin-right: 0.2em; vertical-align: -0.08em; box-sizing: border-box; }
+.stk.tick .to .cb { margin-left: 0.15em; }
+.stk.tick .tsup { margin-top: 0.35em; line-height: 0; }
+.stk.tick .tsup b { line-height: 1.1; }
+select.i.sm { padding: 3px 6px; font-size: 13px; margin-top: 3px; max-width: 200px; }
