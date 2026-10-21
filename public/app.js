@@ -178,7 +178,10 @@
     var colors = [], bands = [], band = null, sups = suppliersFor(ui.cat);
     var h = step("เลือกรุ่น " + (watch ? "Apple Watch" : ui.cat), !!m, opts(models, "m", m ? models.indexOf(m) : -1, function (x) { return esc(x.name); }), m && m.name);
     var ready = false;
-    if (m) {
+    // iPad: Wi-Fi / Wi-Fi + Cell is step 2, right after the model (Smile)
+    var wi = CONNECTIVITY.indexOf(s.connectivity);
+    if (m && ui.cat === "iPad") h += step("เลือกรุ่น Wi-Fi / Wi-Fi + Cell", wi > -1, opts(CONNECTIVITY, "w", wi, esc), wi > -1 ? s.connectivity : "");
+    if (m && (ui.cat !== "iPad" || wi > -1)) {
       var ci = s.capacity != null ? m.capacities.indexOf(s.capacity) : -1;
       h += step(watch ? "เลือกขนาดตัวเรือน (Case Size)" : "เลือกความจุ", ci > -1, m.capacities.length ? opts(m.capacities, "c", ci, esc) : none(watch ? "ขนาดตัวเรือน" : "ความจุ"), ci > -1 ? s.capacity : "");
       if (ci > -1) {
@@ -186,11 +189,6 @@
         var ki = s.color != null ? colors.findIndex(function (c) { return c.name === s.color; }) : -1;
         h += step(watch ? "เลือกสีตัวเรือน (Case Color)" : "เลือกสีเครื่อง", ki > -1, colors.length ? opts(colors, "k", ki, function (c) { return '<span class="sw" style="background:' + esc(c.hex) + '"></span>' + esc(c.name); }) : none(watch ? "สีตัวเรือน (ขนาดนี้)" : "สี"), ki > -1 ? s.color : "");
         ready = ki > -1;
-        if (ready && ui.cat === "iPad") {
-          var wi = CONNECTIVITY.indexOf(s.connectivity);
-          h += step("เลือกรุ่น Wi-Fi / Wi-Fi + Cell", wi > -1, opts(CONNECTIVITY, "w", wi, esc), wi > -1 ? s.connectivity : "");
-          ready = wi > -1;
-        }
         if (ready && watch) {
           bands = (m.bands || []).filter(function (b) { return fitsSize(b, s.capacity); });
           var bi = s.band != null ? bands.findIndex(function (b) { return b.name === s.band; }) : -1;
@@ -207,11 +205,11 @@
     }
     $("#steps").innerHTML = h;
     $$("[data-m]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: models[Number(b.dataset.m)].id }; renderSteps(); }; });
-    $$("[data-c]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: m.id, capacity: m.capacities[Number(b.dataset.c)] }; renderSteps(); }; });
-    $$("[data-k]").forEach(function (b) { b.onclick = function () { var c = colors[Number(b.dataset.k)]; ui.sel = { modelId: m.id, capacity: s.capacity, color: c.name, hex: c.hex }; renderSteps(); }; });
+    $$("[data-c]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: m.id, connectivity: s.connectivity, capacity: m.capacities[Number(b.dataset.c)] }; renderSteps(); }; });
+    $$("[data-k]").forEach(function (b) { b.onclick = function () { var c = colors[Number(b.dataset.k)]; ui.sel = { modelId: m.id, connectivity: s.connectivity, capacity: s.capacity, color: c.name, hex: c.hex }; renderSteps(); }; });
     $$("[data-b]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: m.id, capacity: s.capacity, color: s.color, hex: s.hex, band: bands[Number(b.dataset.b)].name }; renderSteps(); }; });
     $$("[data-bo]").forEach(function (b) { b.onclick = function () { ui.sel.bandOption = band.options[Number(b.dataset.bo)]; delete ui.sel.supplierId; renderSteps(); }; });
-    $$("[data-w]").forEach(function (b) { b.onclick = function () { ui.sel.connectivity = CONNECTIVITY[Number(b.dataset.w)]; delete ui.sel.supplierId; renderSteps(); }; });
+    $$("[data-w]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: m.id, connectivity: CONNECTIVITY[Number(b.dataset.w)] }; renderSteps(); }; });
     $$("[data-s]").forEach(function (b) { b.onclick = function () { ui.sel.supplierId = sups[Number(b.dataset.s)].id; renderSteps(); }; });
     renderPreview();
   }
