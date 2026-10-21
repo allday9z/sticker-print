@@ -70,7 +70,7 @@ input.i:focus, select.i:focus, textarea.i:focus { border-color: var(--accent); }
 .opts { display: flex; flex-wrap: wrap; gap: 8px; }
 .opt { border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 9px 14px; cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; min-height: 42px; }
 .opt:hover { border-color: #9ec5ee; } .opt.on { border-color: var(--accent); background: var(--accent-l); color: var(--accent); font-weight: 600; }
-.opt .olg { height: 16px; width: auto; }
+.opt .olg { height: 16px; width: auto; flex: none; }
 .sw { display: inline-block; width: 13px; height: 13px; border-radius: 50%; border: 1px solid rgba(0,0,0,.2); vertical-align: -2px; margin-right: 3px; }
 .empty-note { background: #fff7e6; border: 1px solid #f3d19c; color: #8a5a00; border-radius: 8px; padding: 9px 12px; font-size: 13.5px; }
 .pvbox { display: flex; justify-content: center; align-items: center; background: repeating-conic-gradient(#f2f3f5 0 25%, #fff 0 50%) 0 0 / 12px 12px; border-radius: 10px; padding: 16px; margin: 10px 0; overflow: auto; }
@@ -84,7 +84,7 @@ input.i:focus, select.i:focus, textarea.i:focus { border-color: var(--accent); }
 .tel { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 10px; background: #fafbfc; }
 .cpick { height: 38px; padding: 2px; }
 .slogo { width: 120px; height: 36px; display: flex; align-items: center; justify-content: center; background: #fafbfc; border: 1px solid var(--line); border-radius: 8px; }
-.slogo img { max-width: 110px; max-height: 28px; }
+.slogo img { max-width: 110px; max-height: 28px; flex: none; }
 .tab:disabled { opacity: .5; cursor: not-allowed; } .tab.sm { padding: 4px 12px; font-size: 13px; }
 
 /* admin */

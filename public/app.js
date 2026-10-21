@@ -33,6 +33,48 @@
     var s = $("#pagestyle") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "pagestyle" }));
     s.textContent = "@page { size: " + L().pageW + "mm " + L().pageH + "mm; margin: 0; }";
   }
+  /* ---------- supplier logos: white edges trimmed, every logo shown at the same visible area ---------- */
+  var LOGO = {};   // logo url → { src: trimmed image (blob URL), r: width / height }
+  function trimLogo(url) {
+    return new Promise(function (res) {
+      var im = new Image();
+      im.onload = function () {
+        var w = im.naturalWidth, h = im.naturalHeight, out = { src: url, r: w / h || 1 };
+        try {
+          var c = document.createElement("canvas"); c.width = w; c.height = h; var g = c.getContext("2d"); g.drawImage(im, 0, 0);
+          var d = g.getImageData(0, 0, w, h).data, x0 = w, y0 = h, x1 = -1, y1 = -1;
+          for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+            var k = (y * w + x) * 4;   // content = not transparent and not (near) white
+            if (d[k + 3] > 16 && (d[k] < 235 || d[k + 1] < 235 || d[k + 2] < 235)) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+          }
+          if (x1 >= x0) {
+            var cw = x1 - x0 + 1, ch = y1 - y0 + 1, t = document.createElement("canvas"); t.width = cw; t.height = ch;
+            t.getContext("2d").drawImage(c, x0, y0, cw, ch, 0, 0, cw, ch);
+            return t.toBlob(function (bl) { LOGO[url] = bl ? { src: URL.createObjectURL(bl), r: cw / ch } : out; res(); }, "image/png");
+          }
+        } catch (e) {}
+        LOGO[url] = out; res();
+      };
+      im.onerror = function () { res(); };
+      im.src = url + (url.indexOf("?") < 0 ? "?" : "&") + "t=" + Date.now();
+    });
+  }
+  function prepLogos(list) { return Promise.all((list || []).filter(function (s) { return s.logo; }).map(function (s) { return trimLogo(s.logo); })); }
+  // Same area for all logos = the area of the widest active logo when it fills the box (maxW × maxH), so none exceeds the box.
+  function logoSize(url, maxW, maxH) {
+    var me = LOGO[url]; if (!me) return null;
+    var fit = function (r) { return r >= maxW / maxH ? maxW * maxW / r : maxH * maxH * r; };
+    var area = fit(me.r);
+    ((C && C.suppliers) || []).forEach(function (s) { var o = s.logo && LOGO[s.logo]; if (o) area = Math.min(area, fit(o.r)); });
+    var hh = Math.sqrt(area / me.r);
+    return { src: me.src, w: Math.round(hh * me.r * 100) / 100, h: Math.round(hh * 100) / 100 };
+  }
+  function logoImg(url, alt, maxW, maxH, unit, cls) {
+    var z = logoSize(url, maxW, maxH);
+    if (!z) return '<img class="' + cls + '" src="' + esc(url) + '" alt="' + esc(alt) + '" style="max-width:' + maxW + unit + ";max-height:" + maxH + unit + '">';
+    return '<img class="' + cls + '" src="' + esc(z.src) + '" alt="' + esc(alt) + '" style="width:' + z.w + unit + ";height:" + z.h + unit + '">';
+  }
+
   // vals: { model, capacity, color: {name, hex}, supplier: {name, logo} }
   function stickerHTML(tpl, v) {
     var lay = L();
@@ -48,7 +90,7 @@
       var style = "font-family:" + (FONT_CSS[e.font] || FONT_CSS.Helvetica) + ";font-size:" + e.size + "pt;font-weight:" + (e.bold ? 700 : 400) + ";font-style:" + (e.italic ? "italic" : "normal") +
         ";text-align:" + e.align + ";margin-top:" + e.mt + "mm;line-height:" + tpl.lineHeight + ";color:" + color;
       if (e.type === "supplier") {
-        if (v.supplier && v.supplier.logo) return '<div class="el" style="' + esc(style) + '"><img class="lg" src="' + esc(v.supplier.logo) + '" alt="' + esc(v.supplier.name) + '" style="max-width:' + (e.logoW || 21.3) + "mm;max-height:" + e.logoH + 'mm"></div>';
+        if (v.supplier && v.supplier.logo) return '<div class="el" style="' + esc(style) + '">' + logoImg(v.supplier.logo, v.supplier.name, e.logoW || 21.3, e.logoH, "mm", "lg") + "</div>";
         text = v.supplier && v.supplier.name;
       }
       if (!text) return "";
@@ -149,7 +191,7 @@
         }
         if (ready) {
           var si = sups.findIndex(function (x) { return x.id === s.supplierId; });
-          h += step("เลือก Supplier", si > -1, sups.length ? opts(sups, "s", si, function (x) { return x.logo ? '<img src="' + esc(x.logo) + '" alt="' + esc(x.name) + '" class="olg"><span class="small">' + esc(x.name) + "</span>" : esc(x.name); }) : '<div class="empty-note">ยังไม่มีซัพพลายเออร์สำหรับหมวดนี้</div>', si > -1 ? sups[si].name : "");
+          h += step("เลือก Supplier", si > -1, sups.length ? opts(sups, "s", si, function (x) { return x.logo ? logoImg(x.logo, x.name, 76, 18, "px", "olg") + '<span class="small">' + esc(x.name) + "</span>" : esc(x.name); }) : '<div class="empty-note">ยังไม่มีซัพพลายเออร์สำหรับหมวดนี้</div>', si > -1 ? sups[si].name : "");
         }
       }
     }
@@ -230,7 +272,7 @@
   async function viewAdmin() {
     if (!C.admin) return loginView();
     if (C.mustChange) { var pv = passwordView(true); setView(pv.html); return pv.bind(); }
-    try { A = await api("/api/admin/catalog"); } catch (e) { if (e.status === 401) { C.admin = false; return loginView(); } if (e.code === "mustchange") { C.mustChange = true; return viewAdmin(); } throw e; }
+    try { A = await api("/api/admin/catalog"); await prepLogos(A.suppliers.filter(function (s) { return s.logo && !LOGO[s.logo]; })); } catch (e) { if (e.status === 401) { C.admin = false; return loginView(); } if (e.code === "mustchange") { C.mustChange = true; return viewAdmin(); } throw e; }
     var tabs = [["products", "ข้อมูลสินค้า"], ["suppliers", "ซัพพลายเออร์"], ["template", "เทมเพลต"], ["paper", "ขนาดกระดาษ"], ["account", "บัญชี"]];
     setView('<div class="row"><div><h1>ผู้ดูแลระบบ</h1><p class="sub">เฉพาะผู้ดูแลแก้ไขได้ — หน้าสาขาเลือกและพิมพ์ได้อย่างเดียว</p></div><span class="spacer"></span><button class="btn ghost" id="logout">ออกจากระบบ</button></div>' +
       '<div class="tabs">' + tabs.map(function (t) { return '<button class="tab' + (ui.adminTab === t[0] ? " on" : "") + '" data-at="' + t[0] + '">' + t[1] + "</button>"; }).join("") + '</div><div id="atab"></div>');
@@ -238,7 +280,7 @@
     $("#logout").onclick = async function () { await api("/api/admin/logout", { method: "POST", body: {} }); C.admin = false; location.hash = "#/"; };
     ({ products: adminProducts, suppliers: adminSuppliers, template: adminTemplate, paper: adminPaper, account: adminAccount })[ui.adminTab]();
   }
-  async function refresh() { var adm = C && C.admin; C = await api("/api/catalog"); if (adm && !C.admin) C.admin = false; applyPageSize(); }
+  async function refresh() { var adm = C && C.admin; C = await api("/api/catalog"); if (adm && !C.admin) C.admin = false; await prepLogos(C.suppliers); applyPageSize(); }
   function act(fn) { return async function () { try { await fn.apply(this, arguments); } catch (e) { if (e.status === 401) { C.admin = false; return loginView(); } alert(e.message); } }; }
 
   // --- product data
@@ -305,7 +347,7 @@
   function adminSuppliers() {
     $("#atab").innerHTML = '<div class="card"><div class="row"><b>ซัพพลายเออร์ (ขั้นที่ 4)</b><span class="spacer"></span><input class="i" id="news" placeholder="ชื่อซัพพลายเออร์" style="width:200px"><button class="btn" id="adds">+ เพิ่ม</button></div>' +
       '<p class="small muted">มีโลโก้ → แสดงโลโก้บนสติ๊กเกอร์ · ไม่มีโลโก้ → แสดงชื่อเป็นตัวอักษร</p><div class="list">' + A.suppliers.map(function (s, i) {
-        return '<div class="it' + (s.active ? "" : " off") + '"><div class="slogo">' + (s.logo ? '<img src="' + esc(s.logo) + "?t=" + Date.now() + '" alt="">' : '<span class="muted small">ไม่มีโลโก้</span>') + '</div><div class="main"><input class="i" value="' + esc(s.name) + '" data-sn="' + s.id + '" style="max-width:220px"> <label class="small"><input type="checkbox" data-sa="' + s.id + '"' + (s.active ? " checked" : "") + '> แสดงที่หน้าสาขา</label>' +
+        return '<div class="it' + (s.active ? "" : " off") + '"><div class="slogo">' + (s.logo ? logoImg(s.logo, s.name, 110, 28, "px", "") : '<span class="muted small">ไม่มีโลโก้</span>') + '</div><div class="main"><input class="i" value="' + esc(s.name) + '" data-sn="' + s.id + '" style="max-width:220px"> <label class="small"><input type="checkbox" data-sa="' + s.id + '"' + (s.active ? " checked" : "") + '> แสดงที่หน้าสาขา</label>' +
           '<div class="small">ใช้กับหมวด: ' + A.categories.map(function (c) { return '<label><input type="checkbox" data-scat="' + s.id + '" value="' + c + '"' + (!s.categories || s.categories.indexOf(c) > -1 ? " checked" : "") + "> " + c + "</label>"; }).join(" ") + "</div></div>" +
           '<label class="btn sm ghost">อัปโหลดโลโก้<input type="file" accept="image/png,image/jpeg,image/webp" data-sl="' + s.id + '" hidden></label>' + (s.logo ? '<button class="btn sm ghost" data-slx="' + s.id + '">ลบโลโก้</button>' : "") +
           '<button class="btn sm ghost" data-su="' + s.id + '"' + (i ? "" : " disabled") + '>▲</button><button class="btn sm ghost" data-sd="' + s.id + '"' + (i < A.suppliers.length - 1 ? "" : " disabled") + '>▼</button><button class="btn sm danger" data-sx="' + s.id + '">ลบ</button></div>';
