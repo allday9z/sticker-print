@@ -48,7 +48,7 @@
       var style = "font-family:" + (FONT_CSS[e.font] || FONT_CSS.Helvetica) + ";font-size:" + e.size + "pt;font-weight:" + (e.bold ? 700 : 400) + ";font-style:" + (e.italic ? "italic" : "normal") +
         ";text-align:" + e.align + ";margin-top:" + e.mt + "mm;line-height:" + tpl.lineHeight + ";color:" + color;
       if (e.type === "supplier") {
-        if (v.supplier && v.supplier.logo) return '<div class="el" style="' + esc(style) + '"><img class="lg" src="' + esc(v.supplier.logo) + '" alt="' + esc(v.supplier.name) + '" style="height:' + e.logoH + 'mm"></div>';
+        if (v.supplier && v.supplier.logo) return '<div class="el" style="' + esc(style) + '"><img class="lg" src="' + esc(v.supplier.logo) + '" alt="' + esc(v.supplier.name) + '" style="max-width:' + (e.logoW || 21.3) + "mm;max-height:" + e.logoH + 'mm"></div>';
         text = v.supplier && v.supplier.name;
       }
       if (!text) return "";
@@ -351,7 +351,7 @@
         return '<div class="tel"><div class="row"><b>' + (i + 1) + ". " + EL_LABEL[e.type] + '</b><span class="spacer"></span><button class="btn sm ghost" data-eu="' + i + '"' + (i ? "" : " disabled") + '>▲</button><button class="btn sm ghost" data-ed="' + i + '"' + (i < t.elements.length - 1 ? "" : " disabled") + '>▼</button><button class="x" data-ex="' + i + '">×</button></div>' +
           '<div class="grid4">' +
           (e.type === "text" ? field("ข้อความ", '<input class="i" data-k="text" data-i="' + i + '" value="' + esc(e.text || "") + '">') : "") +
-          (e.type === "supplier" ? field("ความสูงโลโก้ (มม.)", '<input class="i" type="number" step="0.1" data-k="logoH" data-i="' + i + '" value="' + e.logoH + '">') : "") +
+          (e.type === "supplier" ? field("โลโก้กว้างไม่เกิน (มม.)", '<input class="i" type="number" step="0.1" data-k="logoW" data-i="' + i + '" value="' + (e.logoW || 21.3) + '">') + field("โลโก้สูงไม่เกิน (มม.)", '<input class="i" type="number" step="0.1" data-k="logoH" data-i="' + i + '" value="' + e.logoH + '">') : "") +
           field("ฟอนต์", '<select class="i" data-k="font" data-i="' + i + '">' + A.fonts.map(function (f) { return "<option" + (f === e.font ? " selected" : "") + ">" + f + "</option>"; }).join("") + "</select>") +
           field("ขนาด (pt)", '<input class="i" type="number" step="0.5" data-k="size" data-i="' + i + '" value="' + e.size + '">') +
           field("สีตัวอักษร", '<input type="color" class="i cpick" data-k="color" data-i="' + i + '" value="' + e.color + '">' + (e.type === "color" ? '<label class="small"><input type="checkbox" data-k="useItemColor" data-i="' + i + '"' + (e.useItemColor ? " checked" : "") + "> ใช้สีของสีเครื่อง</label>" : "")) +
@@ -374,7 +374,7 @@
     }
     drawEls(); preview();
     ["#tpad", "#tval", "#tlh", "#smod", "#ssup"].forEach(function (s) { $(s).addEventListener("input", preview); $(s).addEventListener("change", preview); });
-    $("#tadd").onclick = function () { var ty = $("#tnew").value; t.elements.push({ type: ty, font: "Helvetica", size: 8, bold: false, italic: false, color: "#000000", align: "center", mt: 0.3, prefix: "", suffix: "", logoH: 2.6, useItemColor: true, text: ty === "text" ? "ข้อความ" : "" }); drawEls(); preview(); };
+    $("#tadd").onclick = function () { var ty = $("#tnew").value; t.elements.push({ type: ty, font: "Helvetica", size: 8, bold: false, italic: false, color: "#000000", align: "center", mt: 0.3, prefix: "", suffix: "", logoW: 21.3, logoH: 6.35, useItemColor: true, text: ty === "text" ? "ข้อความ" : "" }); drawEls(); preview(); };
     $("#tsave").onclick = act(async function () { preview(); await api("/api/admin/template/" + ui.tplCat, { method: "PUT", body: t }); toast("บันทึกเทมเพลตแล้ว"); await refresh(); A.templates = C.templates; });
   }
 
@@ -396,7 +396,7 @@
     pv();
     $("#lsave").onclick = act(async function () { try { C.layout = await api("/api/admin/layout", { method: "PUT", body: read() }); applyPageSize(); $("#lerr").textContent = ""; toast("บันทึกแล้ว"); } catch (e) { if (e.status === 401) throw e; $("#lerr").textContent = e.message; } });
     $("#ltest").onclick = function () { var v = read(), saved = C.layout; C.layout = Object.assign({}, saved, v); var h = buildSheets([], 1, { borders: true, numbers: true }); printSheets(h); C.layout = saved; };
-    $("#lreset").onclick = function () { var d = { pageW: 210, pageH: 297, cols: 5, rows: 10, cellW: 42, cellH: 27.9, marginTop: 9, marginLeft: 0, gapX: 0, gapY: 0, offsetX: 0, offsetY: 0 }; Object.keys(d).forEach(function (k) { $("#l_" + k).value = d[k]; }); pv(); };
+    $("#lreset").onclick = function () { var d = { pageW: 210, pageH: 297, cols: 5, rows: 10, cellW: 38, cellH: 27, marginTop: 9.45, marginLeft: 2, gapX: 4, gapY: 0.9, offsetX: 0, offsetY: 0 }; Object.keys(d).forEach(function (k) { $("#l_" + k).value = d[k]; }); pv(); };
   }
   function adminAccount() { var pv = passwordView(false); $("#atab").innerHTML = pv.html; pv.bind(); }
 

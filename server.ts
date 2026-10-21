@@ -28,20 +28,25 @@ const WATCH_MODELS = ["Apple Watch SE", "Apple Watch Series 6", "Apple Watch SE 
 const SEED_MODELS: Record<string, string[]> = { iPhone: IPHONE_MODELS, iPad: IPAD_MODELS, Watch: WATCH_MODELS }
 // Supplier → categories it applies to (null = all). Watch: Synnex / VST only.
 const SUPPLIERS: [string, string[] | null][] = [["Synnex", null], ["VST", null], ["AIS", ["iPhone", "iPad"]]]
+// Logos from Smile's Pages templates (Data/image1 = Synnex, Data/image2 = VST ECS).
+const SUPPLIER_LOGOS: Record<string, string> = { Synnex: "logo-synnex.png", VST: "logo-vst.png" }
+const logoFile = async (f: string) => new Uint8Array(await Bun.file(resolve(PUBLIC, f)).arrayBuffer())
 
-// Sheet: A4 portrait, 5 × 10 = 50 labels of 42 × 27.9 mm, centred vertically.
-const DEFAULT_LAYOUT = { pageW: 210, pageH: 297, cols: 5, rows: 10, cellW: 42, cellH: 27.9, marginTop: 9, marginLeft: 0, gapX: 0, gapY: 0, offsetX: 0, offsetY: 0, showBorders: false }
+// Sheet: A4 portrait, 5 × 10 = 50 labels of 38 × 27 mm (Smile, htask-1792553252649). Smile's Pages template is a
+// 42 × 27.9 mm grid starting 9 mm from the top; each label sits centred in its grid cell (gaps 4 / 0.9 mm).
+const DEFAULT_LAYOUT = { pageW: 210, pageH: 297, cols: 5, rows: 10, cellW: 38, cellH: 27, marginTop: 9.45, marginLeft: 2, gapX: 4, gapY: 0.9, offsetX: 0, offsetY: 0, showBorders: false }
 type Layout = typeof DEFAULT_LAYOUT
 const FONTS = ["Helvetica", "Noto Sans Thai", "Sarabun", "Prompt", "Kanit"]
 const EL_TYPES = ["model", "capacity", "color", "band", "bandOption", "supplier", "text"]
 // Default template = the look of Smile's sample (model / capacity / colour / logo, centred, 9 pt).
+// Logos fit a box (logoW × logoH mm, aspect kept) = the template's sizes: Synnex 21.3 × 3.0, VST ECS 19.05 × 6.35.
 const DEFAULT_TEMPLATE = {
   padding: 1.2, valign: "center", lineHeight: 1.15,
   elements: [
     { type: "model", font: "Helvetica", size: 9, bold: true, italic: false, color: "#000000", align: "center", mt: 0, prefix: "", suffix: "" },
     { type: "capacity", font: "Helvetica", size: 9, bold: false, italic: false, color: "#000000", align: "center", mt: 0.3, prefix: "", suffix: "" },
     { type: "color", font: "Helvetica", size: 9, bold: false, italic: false, color: "#000000", useItemColor: true, align: "center", mt: 0.3, prefix: "", suffix: "" },
-    { type: "supplier", font: "Helvetica", size: 8, bold: true, italic: false, color: "#000000", align: "center", mt: 0.8, prefix: "", suffix: "", logoH: 2.6 },
+    { type: "supplier", font: "Helvetica", size: 8, bold: true, italic: false, color: "#000000", align: "center", mt: 0.8, prefix: "", suffix: "", logoW: 21.3, logoH: 6.35 },
   ],
 }
 
@@ -66,12 +71,12 @@ async function initDB() {
   }
   const [{ s }] = await sql`SELECT count(*)::int AS s FROM sticker_suppliers`
   if (s === 0) {
-    const synnexLogo = new Uint8Array(await Bun.file(resolve(PUBLIC, "logo-synnex.png")).arrayBuffer())
     for (const [i, [name, cats]] of SUPPLIERS.entries()) {
-      const c = cats ? JSON.stringify(cats) : null
-      if (name === "Synnex") await sql`INSERT INTO sticker_suppliers (name, logo, logo_mime, sort, categories) VALUES (${name}, ${synnexLogo}, 'image/png', ${i}, ${c}::jsonb)`
+      const c = cats ? JSON.stringify(cats) : null, f = SUPPLIER_LOGOS[name]
+      if (f) await sql`INSERT INTO sticker_suppliers (name, logo, logo_mime, sort, categories) VALUES (${name}, ${await logoFile(f)}, 'image/png', ${i}, ${c}::jsonb)`
       else await sql`INSERT INTO sticker_suppliers (name, sort, categories) VALUES (${name}, ${i}, ${c}::jsonb)`
     }
+    await setSetting("migrated:vst-logo", true)
     console.log("[db] seeded suppliers", SUPPLIERS.map((x) => x[0]).join(", "))
     await setSetting("migrated:supplier-categories", true)
   }
@@ -80,6 +85,30 @@ async function initDB() {
     await sql`UPDATE sticker_suppliers SET categories = '["iPhone","iPad"]'::jsonb WHERE lower(name) = 'ais' AND categories IS NULL`
     await setSetting("migrated:supplier-categories", true)
     console.log("[db] AIS limited to iPhone / iPad")
+  }
+  // Existing installs (htask-1792553252649), once each: VST gets the VST ECS logo from Smile's template (only if it has none);
+  // the layout moves to 38 × 27 mm labels on the same grid; supplier logos get the template's box size.
+  if (!(await getSetting("migrated:vst-logo"))) {
+    const r = await sql`UPDATE sticker_suppliers SET logo = ${await logoFile(SUPPLIER_LOGOS.VST)}, logo_mime = 'image/png' WHERE lower(name) IN ('vst', 'vst ecs') AND logo IS NULL`
+    await setSetting("migrated:vst-logo", true); console.log("[db] VST logo added:", r.count)
+  }
+  if (!(await getSetting("migrated:label-38x27"))) {
+    const l = await getSetting("layout")
+    // Only a layout still on the old 42 × 27.9 grid is converted; offsets / page size / borders are kept.
+    if (l && l.cellW === 42 && l.cellH === 27.9 && !l.gapX && !l.gapY && l.cols === 5 && l.rows === 10) {
+      await setSetting("layout", { ...l, cellW: 38, cellH: 27, gapX: 4, gapY: 0.9, marginLeft: (l.marginLeft || 0) + 2, marginTop: (l.marginTop ?? 9) + 0.45 })
+      console.log("[db] layout converted to 38 x 27 mm labels")
+    }
+    await setSetting("migrated:label-38x27", true)
+  }
+  if (!(await getSetting("migrated:logo-box"))) {
+    for (const cat of Object.keys(SEED_MODELS)) {
+      const t = await getSetting("template:" + cat); if (!t?.elements) continue
+      let n = 0
+      for (const e of t.elements) if (e.type === "supplier" && e.logoW === undefined && (e.logoH === 2.6 || e.logoH === 2.4)) { e.logoW = 21.3; e.logoH = 6.35; n++ }
+      if (n) { await setSetting("template:" + cat, t); console.log("[db] logo box set on template", cat) }
+    }
+    await setSetting("migrated:logo-box", true)
   }
   // Admin account: created from ADMIN_PASSWORD once, must be changed at first login.
   if (!(await getSetting("admin")) && process.env.ADMIN_PASSWORD) {
@@ -94,7 +123,7 @@ async function getLayout(): Promise<Layout> { return { ...DEFAULT_LAYOUT, ...((a
 // Watch default: model / case size / case colour / band (+ option) / supplier.
 const el = (type: string, x: any = {}) => ({ type, font: "Helvetica", size: 8.5, bold: false, italic: false, color: "#000000", align: "center", mt: 0.25, prefix: "", suffix: "", ...x })
 const DEFAULT_TEMPLATES: Record<string, any> = {
-  Watch: { padding: 1.2, valign: "center", lineHeight: 1.12, elements: [el("model", { bold: true, mt: 0 }), el("capacity"), el("color", { useItemColor: true }), el("band"), el("bandOption"), el("supplier", { size: 8, bold: true, mt: 0.6, logoH: 2.4 })] },
+  Watch: { padding: 1.2, valign: "center", lineHeight: 1.12, elements: [el("model", { bold: true, mt: 0 }), el("capacity"), el("color", { useItemColor: true }), el("band"), el("bandOption"), el("supplier", { size: 8, bold: true, mt: 0.6, logoW: 21.3, logoH: 6.35 })] },
 }
 async function getTemplate(cat: string) { return (await getSetting("template:" + cat)) ?? DEFAULT_TEMPLATES[cat] ?? DEFAULT_TEMPLATE }
 
@@ -125,7 +154,7 @@ function cleanTemplate(b: any) {
     // prefix / suffix keep their spaces (e.g. "- ")
     prefix: String(e.prefix ?? "").replace(/[\u0000-\u001f]/g, "").slice(0, 30), suffix: String(e.suffix ?? "").replace(/[\u0000-\u001f]/g, "").slice(0, 30),
     ...(e.type === "color" ? { useItemColor: e.useItemColor !== false } : {}),
-    ...(e.type === "supplier" ? { logoH: num(e.logoH, 1, 15, 2.6) } : {}), ...(e.type === "text" ? { text: str(e.text, 80) } : {}),
+    ...(e.type === "supplier" ? { logoW: num(e.logoW, 3, 60, 21.3), logoH: num(e.logoH, 1, 20, 6.35) } : {}), ...(e.type === "text" ? { text: str(e.text, 80) } : {}),
   }))
   if (!els.length) throw new Error("เทมเพลตต้องมีอย่างน้อย 1 บรรทัด")
   return { padding: num(b?.padding, 0, 10, 1.2), valign: b?.valign === "top" ? "top" : "center", lineHeight: num(b?.lineHeight, 0.8, 2, 1.15), elements: els }
