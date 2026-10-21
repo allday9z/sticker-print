@@ -7,7 +7,8 @@ a { color: var(--accent); }
 
 .top { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 18px; padding: 10px 20px; background: #fff; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
-.brand .dot { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #0a66c2, #34a0ff); }
+.brand .logo { width: 38px; height: 38px; flex: none; transition: transform .25s; }
+.brand:hover .logo { transform: rotate(-8deg) scale(1.06); }
 .brand span { display: flex; flex-direction: column; line-height: 1.15; } .brand small { color: var(--muted); font-size: 11.5px; }
 nav { display: flex; gap: 4px; flex-wrap: wrap; }
 nav a { padding: 7px 12px; border-radius: 8px; text-decoration: none; color: #374151; font-weight: 500; }
