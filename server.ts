@@ -37,7 +37,9 @@ const logoFile = async (f: string) => new Uint8Array(await Bun.file(resolve(PUBL
 const DEFAULT_LAYOUT = { pageW: 210, pageH: 297, cols: 5, rows: 10, cellW: 38, cellH: 27, marginTop: 9.45, marginLeft: 2, gapX: 4, gapY: 0.9, offsetX: 0, offsetY: 0, showBorders: false }
 type Layout = typeof DEFAULT_LAYOUT
 const FONTS = ["Helvetica", "Noto Sans Thai", "Sarabun", "Prompt", "Kanit"]
-const EL_TYPES = ["model", "capacity", "color", "band", "bandOption", "supplier", "received", "text"]
+const EL_TYPES = ["model", "capacity", "color", "connectivity", "band", "bandOption", "supplier", "received", "text"]
+// iPad: Wi-Fi / Wi-Fi + Cellular chosen on the branch page, its own line after the colour (Smile, htask-1792571201110).
+const CONNECTIVITY_EL = { type: "connectivity", font: "Helvetica", size: 9, bold: false, italic: false, color: "#000000", align: "center", mt: 0.3, prefix: "", suffix: "" }
 // Last line of every label: the date the branch received the goods (entered on the branch page) — Smile, htask-1792569623133.
 const RECEIVED_EL = { type: "received", font: "Helvetica", size: 7, bold: false, italic: false, color: "#000000", align: "center", mt: 0.5, prefix: "", suffix: "" }   // date only (Smile, htask-1792571045003)
 // Default template = the look of Smile's sample (model / capacity / colour / logo, centred, 9 pt).
@@ -184,6 +186,15 @@ async function initDB() {
     }
     await setSetting("migrated:received-noprefix", true)
   }
+  // A saved iPad template gets the connectivity line after the colour, once.
+  if (!(await getSetting("migrated:ipad-connectivity"))) {
+    const t = await getSetting("template:iPad")
+    if (t?.elements && !t.elements.some((e: any) => e.type === "connectivity")) {
+      const i = t.elements.findIndex((e: any) => e.type === "color"), j = t.elements.findIndex((e: any) => e.type === "supplier" || e.type === "received")
+      t.elements.splice(i > -1 ? i + 1 : j > -1 ? j : t.elements.length, 0, { ...CONNECTIVITY_EL }); await setSetting("template:iPad", t); console.log("[db] connectivity line added to template iPad")
+    }
+    await setSetting("migrated:ipad-connectivity", true)
+  }
   // Admin account: created from ADMIN_PASSWORD once, must be changed at first login.
   if (!(await getSetting("admin")) && process.env.ADMIN_PASSWORD) {
     await setSetting("admin", { hash: await Bun.password.hash(process.env.ADMIN_PASSWORD), mustChange: true, secret: randomBytes(32).toString("base64url"), ver: 1 })
@@ -197,6 +208,7 @@ async function getLayout(): Promise<Layout> { return { ...DEFAULT_LAYOUT, ...((a
 // Watch default: model / case size / case colour / band (+ option) / supplier.
 const el = (type: string, x: any = {}) => ({ type, font: "Helvetica", size: 8.5, bold: false, italic: false, color: "#000000", align: "center", mt: 0.25, prefix: "", suffix: "", ...x })
 const DEFAULT_TEMPLATES: Record<string, any> = {
+  iPad: { ...DEFAULT_TEMPLATE, elements: DEFAULT_TEMPLATE.elements.flatMap((e: any) => e.type === "color" ? [e, CONNECTIVITY_EL] : [e]) },
   Watch: { padding: 1.2, valign: "center", lineHeight: 1.05, elements: [el("model", { bold: true, mt: 0 }), el("capacity"), el("color", { useItemColor: true }), el("band"), el("bandOption"), el("supplier", { size: 8, bold: true, mt: 0.6, logoW: 21.3, logoH: 6.35 }), { ...RECEIVED_EL, size: 6.5, mt: 0.3 }] },
 }
 async function getTemplate(cat: string) { return (await getSetting("template:" + cat)) ?? DEFAULT_TEMPLATES[cat] ?? DEFAULT_TEMPLATE }

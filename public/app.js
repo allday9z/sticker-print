@@ -8,6 +8,7 @@
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   var C = null;   // catalog from the server
   function today() { var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
+  var CONNECTIVITY = ["Wi-Fi", "Wi-Fi + Cellular"];   // iPad
   function fmtDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ""); return m ? m[3] + "/" + m[2] + "/" + m[1] : ""; }
   var ui = { cat: "iPhone", sel: {}, qty: 1, received: today(), queue: [], start: 1, adminTab: "products", adminCat: "iPhone", tplCat: "iPhone" };
   try { var saved = JSON.parse(localStorage.getItem("sp2") || "{}"); ui.queue = saved.queue || []; ui.start = saved.start || 1; ui.cat = saved.cat || "iPhone"; } catch (e) {}
@@ -90,6 +91,7 @@
       else if (e.type === "band") text = v.band;
       else if (e.type === "bandOption") text = v.bandOption;
       else if (e.type === "received") text = fmtDate(v.received);
+      else if (e.type === "connectivity") text = v.connectivity;
       var style = "font-family:" + (FONT_CSS[e.font] || FONT_CSS.Helvetica) + ";font-size:" + e.size + "pt;font-weight:" + (e.bold ? 700 : 400) + ";font-style:" + (e.italic ? "italic" : "normal") +
         ";text-align:" + e.align + ";margin-top:" + e.mt + "mm;line-height:" + tpl.lineHeight + ";color:" + color;
       if (e.type === "supplier") {
@@ -111,7 +113,7 @@
   }
   function valsOf(item) {
     var sup = C.suppliers.find(function (s) { return s.id === item.supplierId; }) || { name: item.supplierName, logo: null };
-    return { model: item.model, capacity: item.capacity, color: { name: item.color, hex: item.hex }, band: item.band || "", bandOption: item.bandOption || "", received: item.received || "", supplier: { name: sup.name, logo: sup.logo } };
+    return { model: item.model, capacity: item.capacity, color: { name: item.color, hex: item.hex }, band: item.band || "", bandOption: item.bandOption || "", connectivity: item.connectivity || "", received: item.received || "", supplier: { name: sup.name, logo: sup.logo } };
   }
   function tplFor(cat) { return C.templates[cat]; }
 
@@ -184,6 +186,11 @@
         var ki = s.color != null ? colors.findIndex(function (c) { return c.name === s.color; }) : -1;
         h += step(watch ? "เลือกสีตัวเรือน (Case Color)" : "เลือกสีเครื่อง", ki > -1, colors.length ? opts(colors, "k", ki, function (c) { return '<span class="sw" style="background:' + esc(c.hex) + '"></span>' + esc(c.name); }) : none(watch ? "สีตัวเรือน (ขนาดนี้)" : "สี"), ki > -1 ? s.color : "");
         ready = ki > -1;
+        if (ready && ui.cat === "iPad") {
+          var wi = CONNECTIVITY.indexOf(s.connectivity);
+          h += step("เลือกรุ่น Wi-Fi / Wi-Fi + Cellular", wi > -1, opts(CONNECTIVITY, "w", wi, esc), wi > -1 ? s.connectivity : "");
+          ready = wi > -1;
+        }
         if (ready && watch) {
           bands = (m.bands || []).filter(function (b) { return fitsSize(b, s.capacity); });
           var bi = s.band != null ? bands.findIndex(function (b) { return b.name === s.band; }) : -1;
@@ -204,14 +211,16 @@
     $$("[data-k]").forEach(function (b) { b.onclick = function () { var c = colors[Number(b.dataset.k)]; ui.sel = { modelId: m.id, capacity: s.capacity, color: c.name, hex: c.hex }; renderSteps(); }; });
     $$("[data-b]").forEach(function (b) { b.onclick = function () { ui.sel = { modelId: m.id, capacity: s.capacity, color: s.color, hex: s.hex, band: bands[Number(b.dataset.b)].name }; renderSteps(); }; });
     $$("[data-bo]").forEach(function (b) { b.onclick = function () { ui.sel.bandOption = band.options[Number(b.dataset.bo)]; delete ui.sel.supplierId; renderSteps(); }; });
+    $$("[data-w]").forEach(function (b) { b.onclick = function () { ui.sel.connectivity = CONNECTIVITY[Number(b.dataset.w)]; delete ui.sel.supplierId; renderSteps(); }; });
     $$("[data-s]").forEach(function (b) { b.onclick = function () { ui.sel.supplierId = sups[Number(b.dataset.s)].id; renderSteps(); }; });
     renderPreview();
   }
   function currentItem() {
     var s = ui.sel, m = C.models.find(function (x) { return x.id === s.modelId; }), sup = suppliersFor(ui.cat).find(function (x) { return x.id === s.supplierId; });
     if (!m || s.capacity == null || s.color == null || !sup) return null;
+    if (ui.cat === "iPad" && CONNECTIVITY.indexOf(s.connectivity) === -1) return null;
     if (ui.cat === "Watch") { var b = (m.bands || []).find(function (x) { return x.name === s.band; }); if (!b || (b.options.length && b.options.indexOf(s.bandOption) === -1)) return null; }
-    return { cat: ui.cat, model: m.name, capacity: s.capacity, color: s.color, hex: s.hex, band: s.band || "", bandOption: s.bandOption || "", received: ui.received || "", supplierId: sup.id, supplierName: sup.name };
+    return { cat: ui.cat, model: m.name, capacity: s.capacity, color: s.color, hex: s.hex, band: s.band || "", bandOption: s.bandOption || "", connectivity: ui.cat === "iPad" ? s.connectivity : "", received: ui.received || "", supplierId: sup.id, supplierName: sup.name };
   }
   function renderPreview() {
     var it = currentItem(), pv = $("#pv");
@@ -228,9 +237,9 @@
     $("#qm").onclick = function () { setQ(ui.qty - 1); }; $("#qp").onclick = function () { setQ(ui.qty + 1); }; $("#qn").oninput = function () { setQ(this.value); };
     $("#qfill").onclick = function () { var per = L().cols * L().rows, used = (ui.start - 1 + totalQty()) % per; setQ(per - used || per); };
     $("#add").onclick = function () {
-      var key = JSON.stringify([it.cat, it.model, it.capacity, it.color, it.band, it.bandOption, it.supplierId, it.received]), ex = ui.queue.find(function (q) { return q.key === key; });
+      var key = JSON.stringify([it.cat, it.model, it.capacity, it.color, it.connectivity, it.band, it.bandOption, it.supplierId, it.received]), ex = ui.queue.find(function (q) { return q.key === key; });
       if (ex) ex.qty += ui.qty; else ui.queue.push(Object.assign({ key: key, qty: ui.qty }, it));
-      persist(); toast("เพิ่ม " + ui.qty + " ดวง: " + [it.model, it.capacity, it.color, it.band, it.bandOption].filter(Boolean).join(" ")); renderQueue();
+      persist(); toast("เพิ่ม " + ui.qty + " ดวง: " + [it.model, it.capacity, it.color, it.connectivity, it.band, it.bandOption].filter(Boolean).join(" ")); renderQueue();
     };
   }
   function totalQty() { return ui.queue.reduce(function (a, q) { return a + q.qty; }, 0); }
@@ -241,7 +250,7 @@
     var list = queueList(), sheets = buildSheets(list, ui.start, { pick: true, borders: true });
     box.innerHTML = '<div class="row"><b>รายการที่จะพิมพ์</b><span class="spacer"></span><span><b>' + list.length + "</b> ดวง · <b>" + (list.length ? sheets.length : 0) + "</b> แผ่น</span></div>" +
       (ui.queue.length ? '<div class="ql">' + ui.queue.map(function (q, i) {
-        return '<div class="qi"><div class="qt"><b>' + esc(q.model) + "</b> " + esc(q.capacity) + " · " + esc(q.color) + (q.band ? " · " + esc(q.band) + (q.bandOption ? " " + esc(q.bandOption) : "") : "") + '<div class="small muted">' + (q.received ? "รับสินค้า " + esc(fmtDate(q.received)) + " · " : "") + esc(q.supplierName) + '</div></div><input class="i" type="number" min="1" max="500" value="' + q.qty + '" data-qq="' + i + '"><button class="x" data-qx="' + i + '" title="ลบ">×</button></div>';
+        return '<div class="qi"><div class="qt"><b>' + esc(q.model) + "</b> " + esc(q.capacity) + " · " + esc(q.color) + (q.connectivity ? " · " + esc(q.connectivity) : "") + (q.band ? " · " + esc(q.band) + (q.bandOption ? " " + esc(q.bandOption) : "") : "") + '<div class="small muted">' + (q.received ? "รับสินค้า " + esc(fmtDate(q.received)) + " · " : "") + esc(q.supplierName) + '</div></div><input class="i" type="number" min="1" max="500" value="' + q.qty + '" data-qq="' + i + '"><button class="x" data-qx="' + i + '" title="ลบ">×</button></div>';
       }).join("") + "</div>" : '<p class="muted small">ยังไม่มีรายการ — เลือกสินค้าแล้วกด "เพิ่มลงแผ่น"</p>') +
       '<div class="row" style="margin-top:8px"><label class="small">เริ่มพิมพ์ที่ช่อง</label><input class="i" type="number" min="1" max="' + per + '" id="start" value="' + ui.start + '" style="width:76px"><span class="small muted">กดช่องในตัวอย่างได้ (กระดาษที่ใช้ไปแล้วบางส่วน)</span></div>' +
       sheets.map(function (h, i) { return '<div class="sheetwrap">' + h + '</div><div class="sheetlabel">แผ่นที่ ' + (i + 1) + " / " + sheets.length + "</div>"; }).join("") +
@@ -270,6 +279,7 @@
     var line = function (items) { return items.length ? '<div class="tl">' + items.join("") + "</div>" : ""; };
     var h = '<div class="tm">' + esc(m.name) + "</div>" + line((m.capacities || []).map(function (c) { return box(c); })) +
       line((m.colors || []).map(function (c) { return box(c.name, c.hex); }));
+    if (m.category === "iPad") h += line(CONNECTIVITY.map(function (c) { return box(c); }));
     if (m.category === "Watch") h += line((m.bands || []).map(function (b) {
       var o = b.options || [];
       return '<span class="ti"><span class="cb"></span>' + esc(b.name) + (tk.bandSizes && o.length ? (o.length <= 4 ? ' <span class="to">(' + o.map(function (x) { return '<span class="cb"></span>' + esc(x); }).join(" ") + ")</span>" : ' <span class="to">ไซซ์ ____</span>') : "") + "</span>";
@@ -468,7 +478,7 @@
   }
 
   // --- template designer
-  var EL_LABEL = { model: "รุ่น", capacity: "ความจุ / ขนาดตัวเรือน", color: "สีเครื่อง / สีตัวเรือน", band: "ประเภทสาย (Watch)", bandOption: "ตัวเลือกสาย (Watch)", supplier: "ซัพพลายเออร์", received: "วันที่รับสินค้า", text: "ข้อความคงที่" };
+  var EL_LABEL = { model: "รุ่น", capacity: "ความจุ / ขนาดตัวเรือน", color: "สีเครื่อง / สีตัวเรือน", connectivity: "Wi-Fi / Cellular (iPad)", band: "ประเภทสาย (Watch)", bandOption: "ตัวเลือกสาย (Watch)", supplier: "ซัพพลายเออร์", received: "วันที่รับสินค้า", text: "ข้อความคงที่" };
   function adminTemplate() {
     var t = JSON.parse(JSON.stringify(A.templates[ui.tplCat]));
     var sm = A.models.filter(function (m) { return m.category === ui.tplCat; });
@@ -490,7 +500,7 @@
       var s = A.suppliers.find(function (x) { return x.id === sid; }) || { name: "Supplier" };
       var bd = (m.bands || [])[0];
       return { model: m.name, capacity: m.capacities[0] || (ui.tplCat === "Watch" ? "44mm" : "256GB"), color: m.colors[0] || { name: "สีตัวอย่าง", hex: "#3d4466" },
-        band: bd ? bd.name : (ui.tplCat === "Watch" ? "Sport Band" : ""), bandOption: bd ? (bd.options[0] || "") : (ui.tplCat === "Watch" ? "M/L" : ""), received: today(), supplier: { name: s.name, logo: s.logo } };
+        band: bd ? bd.name : (ui.tplCat === "Watch" ? "Sport Band" : ""), bandOption: bd ? (bd.options[0] || "") : (ui.tplCat === "Watch" ? "M/L" : ""), connectivity: ui.tplCat === "iPad" ? "Wi-Fi + Cellular" : "", received: today(), supplier: { name: s.name, logo: s.logo } };
     }
     function drawEls() {
       $("#tels").innerHTML = t.elements.map(function (e, i) {
