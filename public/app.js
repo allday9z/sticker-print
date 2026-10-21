@@ -8,7 +8,7 @@
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   var C = null;   // catalog from the server
   function today() { var d = new Date(), p = function (n) { return (n < 10 ? "0" : "") + n; }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); }
-  var CONNECTIVITY = ["Wi-Fi", "Wi-Fi + Cellular"];   // iPad
+  var CONNECTIVITY = ["Wi-Fi", "Wi-Fi + Cell"];   // iPad (short form, Smile)
   function fmtDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ""); return m ? m[3] + "/" + m[2] + "/" + m[1] : ""; }
   var ui = { cat: "iPhone", sel: {}, qty: 1, received: today(), queue: [], start: 1, adminTab: "products", adminCat: "iPhone", tplCat: "iPhone" };
   try { var saved = JSON.parse(localStorage.getItem("sp2") || "{}"); ui.queue = saved.queue || []; ui.start = saved.start || 1; ui.cat = saved.cat || "iPhone"; } catch (e) {}
@@ -113,7 +113,7 @@
   }
   function valsOf(item) {
     var sup = C.suppliers.find(function (s) { return s.id === item.supplierId; }) || { name: item.supplierName, logo: null };
-    return { model: item.model, capacity: item.capacity, color: { name: item.color, hex: item.hex }, band: item.band || "", bandOption: item.bandOption || "", connectivity: item.connectivity || "", received: item.received || "", supplier: { name: sup.name, logo: sup.logo } };
+    return { model: item.model, capacity: item.capacity, color: { name: item.color, hex: item.hex }, band: item.band || "", bandOption: item.bandOption || "", connectivity: (item.connectivity || "").replace("Wi-Fi + Cellular", "Wi-Fi + Cell"), received: item.received || "", supplier: { name: sup.name, logo: sup.logo } };
   }
   function tplFor(cat) { return C.templates[cat]; }
 
@@ -188,7 +188,7 @@
         ready = ki > -1;
         if (ready && ui.cat === "iPad") {
           var wi = CONNECTIVITY.indexOf(s.connectivity);
-          h += step("เลือกรุ่น Wi-Fi / Wi-Fi + Cellular", wi > -1, opts(CONNECTIVITY, "w", wi, esc), wi > -1 ? s.connectivity : "");
+          h += step("เลือกรุ่น Wi-Fi / Wi-Fi + Cell", wi > -1, opts(CONNECTIVITY, "w", wi, esc), wi > -1 ? s.connectivity : "");
           ready = wi > -1;
         }
         if (ready && watch) {
@@ -277,9 +277,8 @@
   function tickBody(m, sup) {
     var box = function (t, color) { return '<span class="ti"><span class="cb"></span>' + (color ? '<span style="color:' + esc(color) + '">' + esc(t) + "</span>" : esc(t)) + "</span>"; };
     var line = function (items) { return items.length ? '<div class="tl">' + items.join("") + "</div>" : ""; };
-    var h = '<div class="tm">' + esc(m.name) + "</div>" + line((m.capacities || []).map(function (c) { return box(c); })) +
+    var h = '<div class="tm">' + esc(m.name) + "</div>" + (m.category === "iPad" ? line(CONNECTIVITY.map(function (c) { return box(c); })) : "") + line((m.capacities || []).map(function (c) { return box(c); })) +
       line((m.colors || []).map(function (c) { return box(c.name, c.hex); }));
-    if (m.category === "iPad") h += line(CONNECTIVITY.map(function (c) { return box(c); }));
     if (m.category === "Watch") h += line((m.bands || []).map(function (b) {
       var o = b.options || [];
       return '<span class="ti"><span class="cb"></span>' + esc(b.name) + (tk.bandSizes && o.length ? (o.length <= 4 ? ' <span class="to">(' + o.map(function (x) { return '<span class="cb"></span>' + esc(x); }).join(" ") + ")</span>" : ' <span class="to">ไซซ์ ____</span>') : "") + "</span>";
@@ -478,7 +477,7 @@
   }
 
   // --- template designer
-  var EL_LABEL = { model: "รุ่น", capacity: "ความจุ / ขนาดตัวเรือน", color: "สีเครื่อง / สีตัวเรือน", connectivity: "Wi-Fi / Cellular (iPad)", band: "ประเภทสาย (Watch)", bandOption: "ตัวเลือกสาย (Watch)", supplier: "ซัพพลายเออร์", received: "วันที่รับสินค้า", text: "ข้อความคงที่" };
+  var EL_LABEL = { model: "รุ่น", capacity: "ความจุ / ขนาดตัวเรือน", color: "สีเครื่อง / สีตัวเรือน", connectivity: "Wi-Fi / Wi-Fi + Cell (iPad)", band: "ประเภทสาย (Watch)", bandOption: "ตัวเลือกสาย (Watch)", supplier: "ซัพพลายเออร์", received: "วันที่รับสินค้า", text: "ข้อความคงที่" };
   function adminTemplate() {
     var t = JSON.parse(JSON.stringify(A.templates[ui.tplCat]));
     var sm = A.models.filter(function (m) { return m.category === ui.tplCat; });
@@ -500,7 +499,7 @@
       var s = A.suppliers.find(function (x) { return x.id === sid; }) || { name: "Supplier" };
       var bd = (m.bands || [])[0];
       return { model: m.name, capacity: m.capacities[0] || (ui.tplCat === "Watch" ? "44mm" : "256GB"), color: m.colors[0] || { name: "สีตัวอย่าง", hex: "#3d4466" },
-        band: bd ? bd.name : (ui.tplCat === "Watch" ? "Sport Band" : ""), bandOption: bd ? (bd.options[0] || "") : (ui.tplCat === "Watch" ? "M/L" : ""), connectivity: ui.tplCat === "iPad" ? "Wi-Fi + Cellular" : "", received: today(), supplier: { name: s.name, logo: s.logo } };
+        band: bd ? bd.name : (ui.tplCat === "Watch" ? "Sport Band" : ""), bandOption: bd ? (bd.options[0] || "") : (ui.tplCat === "Watch" ? "M/L" : ""), connectivity: ui.tplCat === "iPad" ? "Wi-Fi + Cell" : "", received: today(), supplier: { name: s.name, logo: s.logo } };
     }
     function drawEls() {
       $("#tels").innerHTML = t.elements.map(function (e, i) {

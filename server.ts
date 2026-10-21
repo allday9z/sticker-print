@@ -38,7 +38,7 @@ const DEFAULT_LAYOUT = { pageW: 210, pageH: 297, cols: 5, rows: 10, cellW: 38, c
 type Layout = typeof DEFAULT_LAYOUT
 const FONTS = ["Helvetica", "Noto Sans Thai", "Sarabun", "Prompt", "Kanit"]
 const EL_TYPES = ["model", "capacity", "color", "connectivity", "band", "bandOption", "supplier", "received", "text"]
-// iPad: Wi-Fi / Wi-Fi + Cellular chosen on the branch page, its own line after the colour (Smile, htask-1792571201110).
+// iPad: Wi-Fi / Wi-Fi + Cell chosen on the branch page, its own line — 2nd, right under the model (Smile, htask-1792571201110 / -1745462).
 const CONNECTIVITY_EL = { type: "connectivity", font: "Helvetica", size: 9, bold: false, italic: false, color: "#000000", align: "center", mt: 0.3, prefix: "", suffix: "" }
 // Last line of every label: the date the branch received the goods (entered on the branch page) — Smile, htask-1792569623133.
 const RECEIVED_EL = { type: "received", font: "Helvetica", size: 7, bold: false, italic: false, color: "#000000", align: "center", mt: 0.5, prefix: "", suffix: "" }   // date only (Smile, htask-1792571045003)
@@ -195,6 +195,16 @@ async function initDB() {
     }
     await setSetting("migrated:ipad-connectivity", true)
   }
+  // Saved iPad template: connectivity moves to the 2nd line (right after the model), once.
+  if (!(await getSetting("migrated:ipad-connectivity-2nd"))) {
+    const t = await getSetting("template:iPad")
+    const ci = t?.elements ? t.elements.findIndex((e: any) => e.type === "connectivity") : -1
+    if (ci > -1) {
+      const [c] = t.elements.splice(ci, 1), mi = t.elements.findIndex((e: any) => e.type === "model")
+      t.elements.splice(mi > -1 ? mi + 1 : 0, 0, c); await setSetting("template:iPad", t); console.log("[db] connectivity moved to line 2 on template iPad")
+    }
+    await setSetting("migrated:ipad-connectivity-2nd", true)
+  }
   // Admin account: created from ADMIN_PASSWORD once, must be changed at first login.
   if (!(await getSetting("admin")) && process.env.ADMIN_PASSWORD) {
     await setSetting("admin", { hash: await Bun.password.hash(process.env.ADMIN_PASSWORD), mustChange: true, secret: randomBytes(32).toString("base64url"), ver: 1 })
@@ -208,7 +218,7 @@ async function getLayout(): Promise<Layout> { return { ...DEFAULT_LAYOUT, ...((a
 // Watch default: model / case size / case colour / band (+ option) / supplier.
 const el = (type: string, x: any = {}) => ({ type, font: "Helvetica", size: 8.5, bold: false, italic: false, color: "#000000", align: "center", mt: 0.25, prefix: "", suffix: "", ...x })
 const DEFAULT_TEMPLATES: Record<string, any> = {
-  iPad: { ...DEFAULT_TEMPLATE, elements: DEFAULT_TEMPLATE.elements.flatMap((e: any) => e.type === "color" ? [e, CONNECTIVITY_EL] : [e]) },
+  iPad: { ...DEFAULT_TEMPLATE, elements: DEFAULT_TEMPLATE.elements.flatMap((e: any) => e.type === "model" ? [e, CONNECTIVITY_EL] : [e]) },
   Watch: { padding: 1.2, valign: "center", lineHeight: 1.05, elements: [el("model", { bold: true, mt: 0 }), el("capacity"), el("color", { useItemColor: true }), el("band"), el("bandOption"), el("supplier", { size: 8, bold: true, mt: 0.6, logoW: 21.3, logoH: 6.35 }), { ...RECEIVED_EL, size: 6.5, mt: 0.3 }] },
 }
 async function getTemplate(cat: string) { return (await getSetting("template:" + cat)) ?? DEFAULT_TEMPLATES[cat] ?? DEFAULT_TEMPLATE }
