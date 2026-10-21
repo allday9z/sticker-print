@@ -144,6 +144,13 @@ async function initDB() {
     await setSetting("removed:iphone-2026-10-21", { at: new Date().toISOString(), removed: r.map((x: any) => x.name) })
     console.log("[db] removed iPhone models:", r.map((x: any) => x.name).join(", ") || "(none)")
   }
+  // Smile (htask-1792566814554, orange boxes in the screenshot): remove these iPad models — once.
+  if (!(await getSetting("removed:ipad-2026-10-21"))) {
+    const names = ["iPad Air 11-inch (M2)", "iPad Air 13-inch (M2)", "iPad Air 11-inch (M3)", "iPad Air 13-inch (M3)", "iPad Pro 11-inch (M4)", "iPad Pro 13-inch (M4)"]
+    const r = await sql`DELETE FROM sticker_models WHERE category = 'iPad' AND name IN ${sql(names)} RETURNING name`
+    await setSetting("removed:ipad-2026-10-21", { at: new Date().toISOString(), removed: r.map((x: any) => x.name) })
+    console.log("[db] removed iPad models:", r.map((x: any) => x.name).join(", ") || "(none)")
+  }
   // Admin account: created from ADMIN_PASSWORD once, must be changed at first login.
   if (!(await getSetting("admin")) && process.env.ADMIN_PASSWORD) {
     await setSetting("admin", { hash: await Bun.password.hash(process.env.ADMIN_PASSWORD), mustChange: true, secret: randomBytes(32).toString("base64url"), ver: 1 })
